@@ -140,24 +140,24 @@ All experiments follow the **same SDLC steps and standardized rules** to ensure 
 
 ### Templates (Scaffolding)
 
-- [Approach 1: Template](#)  
-- [Approach 2: Template](#)  
-- [Approach 3: Template](#)  
-- [Approach 4: Template](#)  
+- [Approach 1: Human-led, AI as a copilot](https://github.com/SNAIL-IMethIA/template-approach1-human-copilot)  
+- [Approach 2: Human orchestrator with multiple role playing agents](https://github.com/SNAIL-IMethIA/template-approach2-human-orchestrator)  
+- [Approach 3: Single autonomous AI agent for all team roles](https://github.com/SNAIL-IMethIA/template-approach3-single-agent)  
+- [Approach 4: Master agent / AI workflow coordinating multiple agents](https://github.com/SNAIL-IMethIA/template-approach4-ai-workflow)  
 
 ### Project 1: No-code finance strategy builder
 
-- [Human-led, AI as a copilot.](#)  
-- [Human orchestrator with multiple role playing agents.](#)  
-- [Single autonomous AI agent for all team roles.](#)  
-- [Master agent or automated workflow/pipeline coordinating a team of role playing agents.](#)  
+- [Human-led, AI as a copilot](https://github.com/SNAIL-IMethIA/project1-approach1-human-copilot)  
+- [Human orchestrator with multiple role playing agents](https://github.com/SNAIL-IMethIA/project1-approach2-human-orchestrator)  
+- [Single autonomous AI agent for all team roles](https://github.com/SNAIL-IMethIA/project1-approach3-single-agent)  
+- [Master agent / AI workflow coordinating multiple agents](https://github.com/SNAIL-IMethIA/project1-approach4-ai-workflow)  
 
 ### Project 2: Hotel (resort) reservation website
 
-- [Human-led, AI as a copilot.](#)  
-- [Human orchestrator with multiple role playing agents.](#)  
-- [Single autonomous AI agent for all team roles.](#)  
-- [Master agent or automated workflow/pipeline coordinating a team of role playing agents.](#)  
+- [Human-led, AI as a copilot](https://github.com/SNAIL-IMethIA/project2-approach1-human-copilot)  
+- [Human orchestrator with multiple role playing agents](https://github.com/SNAIL-IMethIA/project2-approach2-human-orchestrator)  
+- [Single autonomous AI agent for all team roles](https://github.com/SNAIL-IMethIA/project2-approach3-single-agent)  
+- [Master agent / AI workflow coordinating multiple agents](https://github.com/SNAIL-IMethIA/project2-approach4-ai-workflow)  
 
 ---
 
