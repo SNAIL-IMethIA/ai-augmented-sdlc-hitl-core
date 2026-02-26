@@ -1,0 +1,60 @@
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+sdist/
+wheels/
+*.egg-link
+pip-wheel-metadata/
+
+# ── Virtual environments ───────────────────────────────────────────────────────
+.venv/
+venv/
+ENV/
+env/
+.env/
+
+# ── Tool caches ────────────────────────────────────────────────────────────────
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+.hypothesis/
+
+# ── Coverage ───────────────────────────────────────────────────────────────────
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+*.cover
+
+# ── OS ─────────────────────────────────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+desktop.ini
+
+# ── Editors / IDEs ─────────────────────────────────────────────────────────────
+.idea/
+*.iml
+# Remove the next line if you want to commit shared VS Code workspace settings.
+.vscode/
+*.suo
+*.user
+*.swp
+*.swo
+*~
+
+# ── Logs / temp ────────────────────────────────────────────────────────────────
+*.log
+*.tmp
+*.temp

@@ -25,60 +25,67 @@ The repository centralizes experiment rules and documentation, while templates a
 
 ## 1. Research Overview
 
-This research explores **four AI-assisted SDLC approaches** applied to two projects:
+This research explores **four AI-assisted SDLC approaches** applied to two distinct [projects](#project-1-no-code-finance-strategy-builder) on a span of **24 work hours per project (3 standard work days of 8 hours each)**:
 
 - Human-led development with AI as a copilot
 - Human orchestrator managing multiple AI agents  
 - Autonomous single AI agent  
 - Master AI agent coordinating a team of agents  
 
-Each approach is performed from scratch and goes through the [7 same SDLC phases](#2-sdlc-phases-v-model). The same frozen backlog associated with the corresponding project is used in each project.  
+Each approach is performed from scratch and goes through the [8 same SDLC phases](#2-sdlc-phases-v-model). The same frozen backlog associated with the corresponding project is used in each project.
+
+> **Note on Phase 1:** Stakeholder Requirements Definition (Phase 1) is conducted once per project by the human overseer, prior to and independently of all timed experiments. It is excluded from the 24-hour worktime measurement. All four approaches start from the same approved stakeholder requirements, extracted and formalised from client interviews and notes.  
 
 ---
 
 ## 2. SDLC Phases (V-Model)
 
-> **Note:** Initial requirements are always obtained by the human overseer to ensure full understanding. These validated requirements serve as the starting point for all approaches.
+> **Note:** Phase 1 (Stakeholder Requirements Definition) is performed once per project by the human overseer, prior to and independently of all timed experiments, and is **excluded from the 24-hour worktime measurement**. Requirements are extracted and formalised from client interviews and notes. The resulting approved Stakeholder Requirements Specification serves as the common, frozen starting point for all four approaches.
 
-### 1. Requirements Analysis
+The SDLC is organized into eight sequential and traceable phases, aligned with ISO/IEC/IEEE 12207 and structured through a V-Model:
 
-- Elicit, analyze, and validate the needs and constraints of the system with stakeholders or clients.
-- Produce a clear, structured set of functional and non-functional requirements.
+1. **Stakeholder Requirements Definition** *(pre-experiment, excluded from worktime)*
 
-### 2. User Story Extraction / Requirement Refinement
+- Conducted once per project by the human overseer before timed evaluation begins.
+- Formalizes stakeholder intent from client interviews and notes into structured, approved requirements.
+- Ensures requirements are atomic, unambiguous, testable, consistent, and feasible.
+- Requirements follow a formal template ([`protocol/requirements.md`](protocol/requirements.md)).
 
-- Break down high-level requirements into actionable user stories, use cases, or functional units.
-- Ensure traceability between requirements and user stories.
+1. **System Requirements Definition**
 
-### 3. Technical Specification
+- Refines stakeholder requirements into technically precise system-level requirements.
+- Includes functional, non-functional, interface, and environmental constraints.
 
-- Define detailed technical specifications, including interfaces, data models, and quality attributes.
-- Serve as the bridge between requirements and design.
+1. **Architecture Definition**
 
-### 4. Architecture Design
+- Establishes high-level structural organization, allocates requirements to components, and defines interfaces.
 
-- Design the high-level structure of the system, including components, their responsibilities, and interactions.
-- Document architectural decisions and rationale.
+1. **Design Definition**
 
-### 5. Implementation
+- Refines architecture into detailed technical specifications for implementation.
+- Includes behavioral definitions, data models, algorithms, and API contracts.
 
-- Develop source code and related artifacts according to the specifications and architecture.
-- Perform unit-level verification to ensure each component meets its design.
+1. **Implementation**
 
-### 6. Verification & Validation (Testing & QA)
+- Transforms design specifications into executable system elements (source code, configuration, documentation).
 
-- Verify that the system and its components meet specifications (verification).
-- Validate that the final product fulfills the original requirements (validation).
-- Includes unit, integration, system, and acceptance testing.
+1. **Verification**
 
-### 7. Deployment
+- Evaluates development artifacts against their specifications (unit, design, integration verification).
+- Ensures correctness and traceability.
 
-- Prepare and transition the validated system into its target environment.
-- Ensure readiness for release and operational use.
+1. **Validation**
+
+- Assesses whether the system fulfills requirements and stakeholder intent in its operational context.
+- Includes system and acceptance validation, scenario execution, and stakeholder evaluation.
+
+1. **Transition**
+
+- Moves the validated system into operational use (deployment, release, handover, acceptance confirmation).
 
 Each phase is executed in every approach (human-led, orchestrated, or autonomous) and emphasizes traceability, reproducibility, and systematic validation in line with the V-model SDLC workflow.
 
-> For further information, see [`protocol/sdlc.md`](protocol/sdlc.md)
+> For full details, see [`protocol/sdlc.md`](protocol/sdlc.md).
 
 ## 3. SDLC Approaches
 
@@ -100,7 +107,7 @@ All experiments follow the **same SDLC steps and standardized rules** to ensure 
 ### Key Guidelines
 
 - **Consistent SDLC Execution** ([details](protocol/sdlc.md))  
-  Each project and approach must follow the same **7-step SDLC workflow**, from requirements analysis to deployment and post-execution evaluation.
+  Each project and approach must follow the same **8-phase SDLC workflow**, from system requirements definition to transition. Phase 1 is pre-experiment and excluded from worktime.
 
 - **Frozen Backlogs** ([details](protocol/backlog.md))  
   Project backlogs are **finalized and immutable** before development on each project starts.  
