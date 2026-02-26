@@ -1,0 +1,74 @@
+[tool.poetry]
+name = "ai-augmented-sdlc-hitl-core"
+version = "0.1.0"
+description = "IEEE 12207-aligned workflow for AI-augmented software development"
+authors = []
+readme = "README.md"
+packages = [{ include = "scripts" }]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+
+[tool.poetry.group.dev.dependencies]
+ruff = "^0.9"
+mypy = "^1.15"
+
+[tool.poetry.scripts]
+req-pipeline = "scripts.requirements.main:main"
+req-priority = "scripts.requirements.assign_priority:main"
+req-register = "scripts.requirements.update_register:main"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+# ---------------------------------------------------------------------------
+# Ruff configuration
+# ---------------------------------------------------------------------------
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "UP",  # pyupgrade
+    "N",   # pep8-naming
+    "D",   # pydocstring
+    "ANN", # flake8-annotations
+    "RUF", # ruff-specific rules
+]
+ignore = [
+    "D100",   # module docstrings (already present, this avoids doubles)
+    "D104",   # missing __init__ docstring
+    "D203",   # one-blank-line-before-class (conflicts with D211)
+    "D213",   # multi-line-summary-second-line (we use first-line style, D212)
+    "RUF001", # EN DASH in string literals: intentional (field names must match template)
+    "RUF002", # EN DASH in docstrings: intentional in range notation (e.g. 0–5)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"scripts/requirements/__init__.py" = ["D"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["scripts"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+# ---------------------------------------------------------------------------
+# Mypy configuration
+# ---------------------------------------------------------------------------
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
