@@ -48,7 +48,7 @@ The SDLC is structured according to a V-Model consisting of two logically relate
 The development side refines intent into progressively more technical and concrete artifacts.  
 The evaluation side examines those artifacts against their originating specifications at equivalent abstraction levels.
 
-diagram here
+![V-Model SDLC Diagram](../figures/v-model.svg)
 
 The alignment between development and evaluation activities is structured as follows:
 
