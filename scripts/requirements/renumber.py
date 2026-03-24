@@ -109,8 +109,9 @@ def _rewrite_ids_in_text(text: str, id_map: dict[str, str]) -> str:
         return text
 
     def replacer(match: re.Match[str]) -> str:
-        full: str = match.group(0)      # e.g. "REQ-59"
-        return id_map.get(full, full)   # swap or pass through unchanged
+        # e.g. "REQ-59"; swap if in the map or pass through unchanged.
+        full: str = match.group(0)
+        return id_map.get(full, full)
 
     return _REQ_ID_RE.sub(replacer, text)
 
@@ -182,7 +183,7 @@ def run(
     # does not change, since their Dependencies / Conflicts may reference IDs
     # that do change).
     # -----------------------------------------------------------------------
-    print("\nRewriting file content…")
+    print("\nRewriting file content...")
     for path in req_files:
         text = path.read_text(encoding="utf-8")
         new_text = _rewrite_ids_in_text(text, id_map)
@@ -193,14 +194,15 @@ def run(
     # Phase 2a: rename files that need a new name → temporary names, so that
     # a direct rename (e.g. REQ-59→REQ-58) never overwrites an existing file.
     # -----------------------------------------------------------------------
-    temp_map: dict[Path, Path] = {}   # temp_path → final_path
+    # Maps each temp path to its intended final path.
+    temp_map: dict[Path, Path] = {}
     files_to_rename = {
         path: req_dir / f"{id_map[path.stem]}.md"
         for path in req_files
         if path.stem in id_map
     }
 
-    print("Renaming files… (phase 1: to temp names)")
+    print("Renaming files... (phase 1: to temp names)")
     for old_path, new_path in files_to_rename.items():
         temp_path = req_dir / f"REQ-TEMP-{old_path.stem}.md"
         old_path.rename(temp_path)
@@ -209,7 +211,7 @@ def run(
     # -----------------------------------------------------------------------
     # Phase 2b: rename temporary files to their final names.
     # -----------------------------------------------------------------------
-    print("Renaming files… (phase 2: to final names)")
+    print("Renaming files... (phase 2: to final names)")
     for temp_path, final_path in temp_map.items():
         temp_path.rename(final_path)
 

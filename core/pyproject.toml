@@ -1,0 +1,28 @@
+[tool.poetry]
+name = "sdlc-core"
+version = "0.1.0"
+description = "Shared runtime library for the AI-Augmented SDLC research experiment"
+authors = []
+readme = "README.md"
+packages = [{ include = "sdlc_core" }]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+# ollama is optional: only needed when using OllamaProvider.
+# Install with: pip install ollama   or add it to your template's pyproject.toml.
+ollama = { version = ">=0.4", optional = true }
+
+[tool.poetry.extras]
+ollama = ["ollama"]
+
+[tool.poetry.scripts]
+sdlc-setup        = "sdlc_core.setup_run:main"
+sdlc-assign-model = "sdlc_core.assign_model:main"
+sdlc-scaffold     = "sdlc_core.scaffold:main"
+sdlc-pause        = "sdlc_core.run_control:pause_main"
+sdlc-resume       = "sdlc_core.run_control:resume_main"
+sdlc-abandon-run  = "sdlc_core.run_control:abandon_main"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

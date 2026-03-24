@@ -5,13 +5,21 @@ description = "IEEE 12207-aligned workflow for AI-augmented software development
 authors = []
 readme = "README.md"
 packages = [{ include = "scripts" }]
+# sdlc_core is a separate installable package under core/
 
 [tool.poetry.dependencies]
 python = "^3.11"
+sdlc-core = {path = "core", develop = true}
 
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.9"
 mypy = "^1.15"
+pytest = "^8.0"
+pytest-cov = "^7.0.0"
+
+[tool.pytest.ini_options]
+testpaths = ["core/tests"]
+addopts = ["-v"]
 
 [tool.poetry.scripts]
 req-pipeline = "scripts.requirements.main:main"
@@ -53,10 +61,12 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
+"core/sdlc_core/__init__.py" = ["D"]
+"core/tests/**/*.py" = ["ANN", "D101", "D102", "D103", "D107"]
 "scripts/requirements/__init__.py" = ["D"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["scripts"]
+known-first-party = ["sdlc_core", "scripts"]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -72,3 +82,14 @@ strict = true
 warn_return_any = true
 warn_unused_configs = true
 ignore_missing_imports = true
+
+# ---------------------------------------------------------------------------
+# Coverage configuration
+# ---------------------------------------------------------------------------
+
+[tool.coverage.run]
+source = ["core/sdlc_core"]
+
+[tool.coverage.report]
+show_missing = true
+fail_under = 90

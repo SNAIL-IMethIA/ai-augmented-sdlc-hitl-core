@@ -58,3 +58,5 @@ desktop.ini
 *.log
 *.tmp
 *.temp
+# Experiment database - comment out if you want to commit raw data with the repo
+# logs/experiment.db

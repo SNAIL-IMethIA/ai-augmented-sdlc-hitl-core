@@ -107,7 +107,8 @@ def validate_file(path: Path) -> list[str]:
     id_match = _ID_RE.search(text)
     if id_match:
         declared_id = id_match.group(1)
-        expected_id = path.stem  # e.g. "REQ-01"
+        # e.g. "REQ-01"
+        expected_id = path.stem
         if declared_id != expected_id:
             violations.append(
                 f"ID mismatch: file is '{expected_id}' but **ID:** declares '{declared_id}'"

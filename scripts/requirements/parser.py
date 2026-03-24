@@ -12,11 +12,10 @@ File structure:
         # Short descriptive title
 
         **ID:** REQ-01
-        …
+        ...
 
     When the heading is present, ``load`` extracts it as ``Requirement.title``.
-    When it is absent, ``title`` is ``None``.  ``save`` can insert or replace
-    the heading via the ``title`` keyword argument.
+    ``save`` can replace the heading via the ``title`` keyword argument.
 
 Parsing strategy for bold fields:
     Each field in a REQ file is formatted as::
@@ -27,13 +26,9 @@ Parsing strategy for bold fields:
     Fields that contain a bulleted score (CS / CD) use the format::
 
         **Customer Satisfaction (0–5):**
-        - 4: Description text…
+        - 4: Description text...
 
     The leading digit on the first bullet is extracted as the score.
-
-    Fields may be absent in older files that predate the template revision
-    that added ``Status`` and ``Priority``.  Absent fields are represented
-    as ``None`` on the returned Requirement and can be added via ``save``.
 
 Insertion order when adding absent bold fields:
     Priority  → inserted after Status (preferred) or after
@@ -89,13 +84,12 @@ def load(path: Path) -> Requirement:
         path: Absolute path to a ``REQ-*.md`` file.
 
     Returns:
-        A :class:`~models.Requirement` instance.  The ``status``,
-        ``priority``, and ``title`` attributes are ``None`` when those
-        fields are absent in the source file.
+        A fully populated :class:`~models.Requirement` instance.
 
     Raises:
         FileNotFoundError: If ``path`` does not exist.
-        ValueError: If CS or CD scores cannot be parsed from the file.
+        ValueError: If any mandatory field (``# Title`` heading, ``Type``,
+            ``Status``, ``Priority``, CS, or CD) is absent or unparseable.
 
     """
     text = path.read_text(encoding="utf-8")
@@ -115,24 +109,41 @@ def load(path: Path) -> Requirement:
             "Ensure the file follows the standard REQ template."
         )
 
-    status_match = _STATUS_RE.search(text)
-    priority_match = _PRIORITY_RE.search(text)
-    type_match = _TYPE_RE.search(text)
-
-    # Title is the text of the first ``# Heading`` in the file.
     title_match = _TITLE_HEADING_RE.search(text)
-    title = title_match.group(1).strip() if title_match else None
+    if not title_match:
+        raise ValueError(
+            f"Missing title heading in '{path.name}'. "
+            "File must start with '# Short descriptive title'."
+        )
+
+    type_match = _TYPE_RE.search(text)
+    if not type_match:
+        raise ValueError(
+            f"Missing '**Type:**' field in '{path.name}'."
+        )
+
+    status_match = _STATUS_RE.search(text)
+    if not status_match:
+        raise ValueError(
+            f"Missing '**Status:**' field in '{path.name}'."
+        )
+
+    priority_match = _PRIORITY_RE.search(text)
+    if not priority_match:
+        raise ValueError(
+            f"Missing '**Priority:**' field in '{path.name}'."
+        )
 
     return Requirement(
         req_id=req_id,
         cs=cs,
         cd=cd,
-        status=status_match.group(1).strip() if status_match else None,
-        priority=priority_match.group(1).strip() if priority_match else None,
+        status=status_match.group(1).strip(),
+        priority=priority_match.group(1).strip(),
         source_path=path,
         raw_text=text,
-        req_type=type_match.group(1).strip() if type_match else None,
-        title=title,
+        req_type=type_match.group(1).strip(),
+        title=title_match.group(1).strip(),
     )
 
 

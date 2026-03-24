@@ -120,7 +120,7 @@ def run(
         if not dry_run:
             parser.save(
                 req,
-                status=req.status if req.status is not None else "Draft",
+                status=req.status,
                 priority=label,
             )
 

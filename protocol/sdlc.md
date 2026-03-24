@@ -2,7 +2,7 @@
 
 ## Table of Contents
 
-1. [SDLC Phases Aligned with IEEE 12207 and Structured Through a V-Model](#sdlc-phases-aligned-with-ieee-12207-and-structured-through-a-v-model)
+1. [Experimental Boundaries](#experimental-boundaries)
 2. [V-Model Structure](#v-model-structure)
 3. [Development Side (System Definition)](#development-side-system-definition)
 
@@ -19,6 +19,8 @@
     - [8. Transition](#8-transition)
 
 5. [V-Model Guarantees](#v-model-guarantees)
+
+---
 
 This document defines the Software Development Lifecycle (SDLC) structure applied in this research.  
 The lifecycle is derived from ISO/IEC/IEEE 12207 (Systems and Software Engineering: Software Life Cycle Processes) and is operationalized using a V-Model structure to ensure systematic refinement, bidirectional traceability, and structured evaluation of artifacts.
@@ -38,6 +40,46 @@ Each phase transforms its input into a more concrete and operational representat
 
 ---
 
+## Experimental Boundaries
+
+### Participant assignment and order effects
+
+The same individual conducts both approach runs for a given project. This eliminates between-person skill variance as a confound in the cross-approach comparison, at the cost of introducing potential learning effects: a participant who completes the human-orchestrated run first may have stronger domain familiarity when supervising the autonomous pipeline run.
+
+To mitigate this, run order is fixed as Approach 1 then Approach 2. This ordering is deliberate. The first run establishes the manually orchestrated baseline, and the second run evaluates autonomous execution under equivalent SDLC artifacts and constraints.
+
+A separate project (project 2) is used to assess cross-project generalizability. The same participant and the same fixed order apply.
+
+### Pre-experiment (excluded from the time budget)
+
+The experiment time budget is **24 hours of active working time**, structured as three working days of eight hours each with no active work outside those periods. Calendar time between sessions is not counted. Each session is recorded as a row in the `sessions` table in the experiment database, opened at the start of the session and closed at its end. The three session rows together constitute the verifiable evidence of the session boundary rule; a gap in interaction log timestamps is circumstantial, whereas the session records are the authoritative account. The run-level `started_at` and `ended_at` fields in the `runs` table reflect the overall run span; per-session timestamps are in `sessions`.
+
+Two categories of work are performed before the time budget opens and are excluded from all time and effort measurements.
+
+**Phase 1 (Stakeholder Requirements Definition)** is conducted once per project by the human overseer. Requirements are validated and approved before any approach begins. Excluding Phase 1 ensures that both approaches start from an identical, frozen input baseline, preventing requirements quality from becoming a confound in the comparison.
+
+**Baseline environment setup** covers the minimal, project-independent infrastructure required to begin any development work:
+
+- Version control repository initialised with a basic project skeleton.
+- Language runtime and dependency management tooling configured.
+- A general CI skeleton (push → build → run tests) in place but not yet connected to any project-specific tests or deployment targets.
+
+Nothing project-specific is pre-configured. The integration of CI/CD with the actual codebase, writing of deployment scripts, environment variable configuration, and all packaging work specific to the project are **in-experiment tasks**. This boundary is intentional: in Approach 2 the automated pipeline is expected to generate this project-specific tooling autonomously, while in Approach 1 the human orchestrator remains in active control of each interaction. That difference is a research finding, not overhead to be eliminated before the clock starts.
+
+### In-experiment (within the 24-hour measurement)
+
+All work performed during the 24-hour window is measured, regardless of how it is done, whether by AI, by automated tooling, or directly by the human without any AI assistance. This includes:
+
+- All SDLC Phases 2–8 and all project-specific CI/CD and deployment configuration they entail.
+- All AI interactions, logged via the prompt log.
+- All manual work performed outside direct AI responses, logged as `manual_edit` interventions with a `time_spent_minutes` value in the `interventions` table. This remains a key observable in Approach 1.
+
+### When time expires
+
+When the 24-hour window closes, the active phase is recorded as the terminal phase for that approach run. Work in progress is committed as-is with a protocol termination note. No further work is performed on that run. Not every approach will reach Phase 8. The set of phases completed within the time budget is one of the primary comparative findings of the study. See the [Phase reach rate](metrics.md#phase-reach-rate) metric.
+
+---
+
 ## V-Model Structure
 
 The SDLC is structured according to a V-Model consisting of two logically related sides:
@@ -48,7 +90,7 @@ The SDLC is structured according to a V-Model consisting of two logically relate
 The development side refines intent into progressively more technical and concrete artifacts.  
 The evaluation side examines those artifacts against their originating specifications at equivalent abstraction levels.
 
-![V-Model SDLC Diagram](../figures/v-model.svg)
+![V-Model SDLC Diagram](../figures/SDLC.png)
 
 The alignment between development and evaluation activities is structured as follows:
 
@@ -68,7 +110,7 @@ This alignment ensures that evaluation activities are derived directly from defi
 
 ### 1. Stakeholder Requirements Definition
 
-> **Experimental scope note:** This phase is conducted once per project by the human overseer, prior to and independently of all timed experiment runs. It is excluded from the 24-hour worktime measurement (3 standard work days of 8 hours each) applied to Phases 2–8. The approved Stakeholder Requirements Specification produced here serves as the common, frozen baseline for all four approaches.
+> **Experimental scope note:** This phase is conducted once per project by the human overseer, prior to and independently of all timed experiment runs. It is excluded from the time budget applied to Phases 2–8. The approved Stakeholder Requirements Specification produced here serves as the common, frozen baseline for both approaches of a given project.
 
 Stakeholder Requirements Definition formalizes stakeholder intent into a structured set of stakeholder requirements. This phase defines why the system exists, what objectives it must fulfill, and under which business, regulatory, operational, and environmental constraints it must operate.
 
@@ -78,33 +120,7 @@ Stakeholder requirements are expressed in a solution-independent manner. They de
 
 #### Requirement Quality Criteria
 
-Each stakeholder requirement must satisfy the following quality attributes:
-
-**Atomic**  
-A requirement expresses a single obligation or capability. It must not combine multiple independent conditions.  
-Example of non-atomic statement:  
-"The system shall store user data and encrypt communications."  
-This contains two distinct obligations and must be decomposed.
-
-**Unambiguous**  
-The requirement must admit only one interpretation. Terms such as "fast", "efficient", or "user-friendly" must be replaced by measurable criteria.  
-Example of ambiguous statement:  
-"The system shall respond quickly."  
-Rewritten as:  
-"The system shall respond to user queries within 2 seconds under normal operating conditions."
-
-**Testable**  
-The requirement must be verifiable through inspection, analysis, demonstration, or testing. A requirement that cannot be objectively evaluated cannot be accepted.
-
-**Consistent**  
-The requirement must not conflict with other stakeholder requirements. Cross-review and traceability analysis are applied to detect contradictions.
-
-**Feasible**  
-The requirement must be technically and operationally achievable within defined constraints.
-
-#### Requirement Template
-
-To ensure uniformity and traceability, stakeholder requirements follow a structured format. A formal Requirement Specification template is maintained in the [`requirements.md`](requirements.md) file to ensure consistent documentation across case studies.
+Each stakeholder requirement must satisfy five quality attributes: atomic, unambiguous, testable, consistent, and feasible. Definitions, examples, and the full requirement template are in [`requirements.md`](requirements.md).
 
 #### Outputs
 
@@ -112,6 +128,10 @@ To ensure uniformity and traceability, stakeholder requirements follow a structu
 - Defined acceptance criteria  
 - Unique identification scheme  
 - Traceability matrix initialization  
+
+#### Phase exit criteria
+
+This phase is complete when all requirements have been validated against the five quality attributes, all requirements carry a unique REQ-NN identifier, and no stakeholder requirement remains without a defined acceptance criterion. The complete set is approved by the human overseer before any approach begins.
 
 ---
 
@@ -132,11 +152,19 @@ Each system requirement is explicitly traceable to one or more stakeholder requi
 
 System requirements must satisfy the same quality attributes defined previously: atomicity, unambiguity, measurability, consistency, and feasibility.
 
+#### Artifact Template
+
+System requirements follow the same structured format as stakeholder requirements. The formal template is maintained in the [`requirements.md`](requirements.md) file.
+
 #### Outputs
 
 - System Requirements Specification (SyRS)  
 - Stakeholder-to-system traceability mappings  
 - System validation criteria  
+
+#### Phase exit criteria
+
+This phase is complete when every stakeholder requirement is addressed by at least one system requirement, all system requirements carry a unique REQ-NN identifier, and the stakeholder-to-system traceability matrix has no gaps. The requirement-to-design linkage rate is not yet required here but must reach 100% before Phase 6 begins.
 
 ---
 
@@ -154,12 +182,20 @@ Architectural definition includes:
 
 Architecture Definition produces a structural baseline against which integration verification will later be conducted.
 
+#### Artifact Templates
+
+Architecture artifacts follow structured formats defined in the [`architecture.md`](architecture.md) file (inspired by the C4 model (Brown, 2018) for component decomposition and the ADR format (Nygard, 2011) for decision recording). Two artifact types are defined: the Architecture Note and the Architectural Decision Record.
+
 #### Outputs
 
 - Architecture description document  
 - Interface specifications  
 - Requirement allocation matrix  
 - Architectural decision records  
+
+#### Phase exit criteria
+
+This phase is complete when every system requirement is allocated to at least one architectural component (requirement allocation rate = 100%), every declared component interface has a corresponding specification, the component dependency graph contains no cycles, and at least one ADR has been recorded for each non-trivial structural decision. A requirement allocation rate below 100% is a blocking defect.
 
 ---
 
@@ -177,12 +213,20 @@ This includes:
 
 Design Definition establishes the baseline for design and component verification.
 
+#### Artifact Template
+
+Design artifacts follow the structured format defined in the [`design.md`](design.md) file (grounded in IEEE 1016-2009).
+
 #### Outputs
 
 - Detailed design documentation  
 - Interface contracts  
 - Data models  
 - Component specifications  
+
+#### Phase exit criteria
+
+This phase is complete when every architectural component has at least one corresponding design specification (DSGN-NN), every declared interface appears in at least one design document with a complete contract, and all design specifications are traceable to their upstream architecture note.
 
 ---
 
@@ -200,12 +244,20 @@ Activities include:
 
 Implementation produces the executable baseline that enters structured evaluation on the evaluation side of the V-Model.
 
+#### Artifact Template
+
+Implementation artifacts follow the structured format defined in the [`implementation.md`](implementation.md) file (grounded in ISO/IEC/IEEE 12207:2017 §6.4.7).
+
 #### Outputs
 
 - Source code  
 - Executable artifacts  
 - Configuration files  
 - Unit verification artifacts  
+
+#### Phase exit criteria
+
+This phase is complete when every design specification (DSGN-NN) has at least one corresponding implementation unit (IMPL-NN), all implementation units compile and pass any automated build checks, and every IMPL-NN is traceable to its originating DSGN-NN. Implementation units that do not pass the build are not considered accepted artifacts.
 
 ---
 
@@ -223,12 +275,20 @@ Verification activities include:
 
 Verification may involve testing, inspection, formal review, or analytical techniques. All verification artifacts maintain traceability to development artifacts.
 
+#### Artifact Templates
+
+Verification artifacts follow the structured formats defined in the [`verification.md`](verification.md) file (grounded in ISO/IEC 29119-3:2021). Two artifact types are defined: the Test Case and the Verification Completion Report.
+
 #### Outputs
 
-- Verification reports  
-- Test suites  
+- Test Cases  
+- Verification Completion Reports  
 - Coverage analysis  
-- Defect records  
+- Anomaly records  
+
+#### Phase exit criteria
+
+This phase is complete when all implementation units have at least one associated test case (VER-NN), a Verification Completion Report (VCR-NN) has been produced for each implementation unit, and the requirement-to-test linkage rate reaches 100%. All test cases must have been executed: a `Not run` status is not acceptable at phase close. Open `Fail` anomalies must either be resolved or formally recorded as known defects carried forward.
 
 ---
 
@@ -245,11 +305,19 @@ Validation activities include:
 
 Validation establishes fitness for purpose and readiness for transition.
 
+#### Artifact Template
+
+Validation artifacts follow the structured format defined in the [`validation.md`](validation.md) file (grounded in ISO/IEC 12207:2017 §6.4.9).
+
 #### Outputs
 
 - Validation reports  
 - Acceptance records  
 - Requirement satisfaction evidence  
+
+#### Phase exit criteria
+
+This phase is complete when at least one validation record (VAL-NN) exists for each system requirement, every validation record has a result of `accepted` or `rejected` (no `not run` records at phase close), and the client or designated stakeholder has formally confirmed which requirements are satisfied. A requirement satisfaction rate below 100% does not block transition but must be documented as an open finding.
 
 ---
 
@@ -268,12 +336,20 @@ Activities include:
 
 Transition marks the formal conclusion of the development lifecycle and the beginning of operational exploitation.
 
+#### Artifact Template
+
+Transition artifacts follow the structured format defined in the [`transition.md`](transition.md) file (grounded in ISO/IEC/IEEE 12207:2017 §6.4.10).
+
 #### Outputs
 
 - Deployment artifacts  
 - Release documentation  
 - Operational configuration records  
 - Acceptance confirmation  
+
+#### Phase exit criteria
+
+This phase is complete when a Transition Record (TRANS-NN) has been produced with a status of `Accepted`, the client or designated stakeholder has confirmed acceptance in writing (name and date recorded in the Acceptance Confirmation field), and the accepted release has been tagged in version control. A deployment that was attempted but not accepted by the client is recorded with status `Deployed` and is not considered a completed phase.
 
 ---
 

@@ -1,7 +1,6 @@
-"""
-Package: scripts.requirements
+"""__init__.py: Tools for managing Volere-inspired requirement files (REQ-*.md).
 
-Tools for managing Volere-inspired requirement files (REQ-*.md).
+Package: scripts.requirements.
 
 Modules:
     models          : Requirement dataclass representing a parsed REQ file.
@@ -21,3 +20,5 @@ Scripts (CLI entry points):
     main            : Orchestrator: renumber (opt) → validate → assign_priority
                       → update_register.
 """
+
+from __future__ import annotations

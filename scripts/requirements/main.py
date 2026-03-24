@@ -305,7 +305,8 @@ def main() -> None:
             print(f"[WARN] No project directories with REQ-*.md files found under {req_root}.")
             return
 
-        print(f"Discovered {len(project_dirs)} project(s): {', '.join(d.name for d in project_dirs)}\n")
+        names = ", ".join(d.name for d in project_dirs)
+        print(f"Discovered {len(project_dirs)} project(s): {names}\n")
 
         for project_dir in project_dirs:
             readme = project_dir / "README.md"

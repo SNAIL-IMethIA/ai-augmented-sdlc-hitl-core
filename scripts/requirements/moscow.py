@@ -18,7 +18,7 @@ Rationale:
     useful its presence is perceived to be.  This prevents a high-CS /
     low-CD requirement from ever outranking a stakeholder blocker.
 
-    The combined-score thresholds on rules 2–5 reflect a symmetric view of
+    The combined-score thresholds on rules 2 to 5 reflect a symmetric view of
     value: both the benefit of implementation and the cost of omission are
     weighted equally when neither score is at its extreme.
 """

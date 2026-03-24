@@ -55,25 +55,25 @@ _TABLE_ROW_RE = re.compile(r"^\|")
 # Matches a table separator row (e.g. |----|---|).
 _SEPARATOR_ROW_RE = re.compile(r"^\|[-| ]+\|$")
 
-# Matches a data row whose first cell is a REQ-NN identifier.
-_DATA_ROW_RE = re.compile(r"^\|\s*REQ-\d+")
-
-
 # ---------------------------------------------------------------------------
 # Metrics helpers
 # ---------------------------------------------------------------------------
 
-def _compute_metrics(reqs: list) -> dict:
+def _compute_metrics(reqs: list[Requirement]) -> dict[str, int]:
     """Compute summary metrics from a list of Requirement instances.
 
-    Returns a dict with keys:
-        total, must, should, could, wont,
-        functional, non_functional, constraint, interface, environmental,
-        other_type,
-        draft, reviewed, approved, deprecated, other_status,
-        avg_cs, avg_cd.
+    Args:
+        reqs: Parsed requirement objects to aggregate.
+
+    Returns:
+        Dict with integer counts keyed by metric name:
+        ``total``, ``must``, ``should``, ``could``, ``wont``,
+        ``functional``, ``non_functional``, ``constraint``, ``interface``,
+        ``environmental``, ``other_type``,
+        ``draft``, ``reviewed``, ``approved``, ``deprecated``, ``other_status``.
+
     """
-    counts: dict = dict(
+    counts: dict[str, int] = dict(
         total=len(reqs),
         must=0, should=0, could=0, wont=0,
         functional=0, non_functional=0, constraint=0,
@@ -83,7 +83,7 @@ def _compute_metrics(reqs: list) -> dict:
 
     for r in reqs:
         # Priority
-        p = (r.priority or "").strip().lower()
+        p = r.priority.strip().lower()
         if p == "must":
             counts["must"] += 1
         elif p == "should":
@@ -94,7 +94,7 @@ def _compute_metrics(reqs: list) -> dict:
             counts["wont"] += 1
 
         # Type
-        t = (r.req_type or "").strip().lower()
+        t = r.req_type.strip().lower()
         if t == "functional":
             counts["functional"] += 1
         elif t in ("non-functional", "non_functional"):
@@ -109,7 +109,7 @@ def _compute_metrics(reqs: list) -> dict:
             counts["other_type"] += 1
 
         # Status
-        s = (r.status or "").strip().lower()
+        s = r.status.strip().lower()
         if s == "draft":
             counts["draft"] += 1
         elif s == "reviewed":
@@ -125,7 +125,7 @@ def _compute_metrics(reqs: list) -> dict:
     return counts
 
 
-def _build_metrics_block(m: dict) -> str:
+def _build_metrics_block(m: dict[str, int]) -> str:
     """Return the full metrics block string including HTML comment delimiters.
 
     Three pure-Markdown tables are stacked vertically, each preceded by a
@@ -196,6 +196,7 @@ def _create_readme(readme_path: Path, req_dir: Path) -> None:
     Args:
         readme_path: Destination path for the new README.
         req_dir:     Directory containing the REQ files (used to derive name).
+
     """
     project_name = req_dir.name
     nl = "\n"
@@ -260,90 +261,30 @@ def _create_readme(readme_path: Path, req_dir: Path) -> None:
 # Internal helpers
 # ---------------------------------------------------------------------------
 
-def _parse_titles_from_readme(readme_path: Path) -> dict[str, str]:
-    """Return a mapping of REQ-ID → title from the existing README table.
-
-    Used only as a migration fallback for REQ files that do not yet carry a
-    ``# Title`` heading.  Once a file has the heading, ``parser.load`` will
-    populate ``Requirement.title`` directly and this lookup is not consulted.
-
-    Args:
-        readme_path: Path to the README.md file to read.
-
-    Returns:
-        Dict mapping e.g. ``"REQ-01"`` → ``"Parallel strategy creation"``.
-        Empty dict when the file does not exist or has no matching rows.
-
-    """
-    if not readme_path.exists():
-        return {}
-
-    titles: dict[str, str] = {}
-    for line in readme_path.read_text(encoding="utf-8").splitlines():
-        stripped = line.strip()
-        if not _DATA_ROW_RE.match(stripped):
-            continue
-        # Split on "|" and grab the first two non-empty cells (ID, Title).
-        cells = [c.strip() for c in stripped.strip("|").split("|")]
-        if len(cells) >= 2 and cells[0]:
-            titles[cells[0]] = cells[1]
-
-    return titles
-
-
-def _build_table(reqs: list[Requirement], fallback_titles: dict[str, str]) -> str:
+def _build_table(reqs: list[Requirement]) -> str:
     """Return the full markdown requirements table as a string.
 
-    Titles are sourced from ``req.title`` (the ``# Heading`` in each REQ
-    file).  When that is absent, ``fallback_titles`` (read from the existing
-    README) is consulted for backward compatibility during migration.
-
-    The Priority column is included whenever any requirement carries a
-    non-None priority value.
+    Titles are sourced from ``req.title`` (the mandatory ``# Heading`` in
+    each REQ file).  All columns including Priority are always emitted.
 
     Args:
-        reqs:            List of :class:`~models.Requirement` instances, in
-                         display order.
-        fallback_titles: Mapping of REQ-ID → title string used when
-                         ``req.title`` is ``None``.
+        reqs: List of :class:`~models.Requirement` instances, in display order.
 
     Returns:
         Markdown table string without a trailing newline.
 
     """
-    has_priority = any(r.priority is not None for r in reqs)
-
-    if has_priority:
-        header = "| ID | Title | Type | CS | CD | Status | Priority | File |"
-        sep    = "| -- | ----- | ---- | -- | -- | ------ | -------- | ---- |"
-    else:
-        header = "| ID | Title | Type | CS | CD | Status | File |"
-        sep    = "| -- | ----- | ---- | -- | -- | ------ | ---- |"
-
-    rows = [header, sep]
+    header = "| ID | Title | Type | CS | CD | Status | Priority | File |"
+    sep    = "| -- | ----- | ---- | -- | -- | ------ | -------- | ---- |"
+    rows   = [header, sep]
 
     for req in reqs:
-        rid      = req.req_id
-        # Title: read from the file's # heading; fall back to the README
-        # register for files that have not yet been given a heading.
-        title    = req.title or fallback_titles.get(rid, "")
-        rtype    = req.req_type if req.req_type else "Functional"
-        cs       = req.cs
-        cd       = req.cd
-        status   = req.status if req.status else "Draft"
-        priority = req.priority if req.priority else ""
-        link     = f"[{rid}.md]({rid}.md)"
-
-        if has_priority:
-            rows.append(
-                f"| {rid} | {title} | {rtype} | {cs} | {cd} "
-                f"| {status} | {priority} | {link} |"
-            )
-        else:
-            rows.append(
-                f"| {rid} | {title} | {rtype} | {cs} | {cd} "
-                f"| {status} | {link} |"
-            )
+        rid  = req.req_id
+        link = f"[{rid}.md]({rid}.md)"
+        rows.append(
+            f"| {rid} | {req.title} | {req.req_type} | {req.cs} | {req.cd} "
+            f"| {req.status} | {req.priority} | {link} |"
+        )
 
     return "\n".join(rows)
 
@@ -389,7 +330,8 @@ def _replace_table_in_text(text: str, new_table: str) -> str:
 
             # Emit the replacement table followed by a single newline.
             new_lines.append(new_table + "\n")
-            continue  # do not advance i again; the outer loop will
+            # Do not advance i again; the outer loop will.
+            continue
 
         new_lines.append(raw)
         i += 1
@@ -406,12 +348,9 @@ def update(readme_path: Path, req_dir: Path, *, dry_run: bool = False) -> int:
 
     Steps performed:
         1. Scan *req_dir* for ``REQ-*.md`` files and parse each one.
-        2. Read titles from the existing README table (titles are not stored
-           in individual REQ files).
-        3. Regenerate the complete table, including a Priority column when
-           any requirement carries a priority value.
-        4. Update the ``**Total requirements:** N`` metadata line.
-        5. Write the result back to *readme_path* (unless ``dry_run``).
+        2. Regenerate the complete table with all columns including Priority.
+        3. Update the ``**Total requirements:** N`` metadata line.
+        4. Write the result back to *readme_path* (unless ``dry_run``).
 
     Args:
         readme_path: Path to the ``README.md`` file to update.
@@ -441,8 +380,7 @@ def update(readme_path: Path, req_dir: Path, *, dry_run: bool = False) -> int:
         )
         return 0
 
-    titles    = _parse_titles_from_readme(readme_path)
-    new_table = _build_table(reqs, titles)
+    new_table = _build_table(reqs)
     metrics   = _compute_metrics(reqs)
     new_block = _build_metrics_block(metrics)
     total     = metrics["total"]
