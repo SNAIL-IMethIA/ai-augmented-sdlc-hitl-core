@@ -33,11 +33,14 @@ What it creates
 
 The output directory must not already exist (to avoid clobbering).
 
-Pinning
--------
-The generated ``pyproject.toml`` pins ``sdlc-core`` to the SHA of the
-current HEAD of this repository.  Run ``sdlc-scaffold`` only when the core
-repo is in the state you want to freeze for the experiment.
+Pinning and dependency source
+-----------------------------
+By default, generated templates depend on ``sdlc-core`` via a pinned Git
+revision (portable across machines). You can also generate a template that
+uses a local path dependency for rapid iteration on the same machine.
+
+Run ``sdlc-scaffold`` only when the core repo is in the state you want to
+freeze for the experiment.
 """
 
 from __future__ import annotations
@@ -99,6 +102,14 @@ def _get_core_repo_url() -> str:
         return url
     except Exception:
         return "https://github.com/OWNER/ai-augmented-sdlc-hitl-core"
+
+
+def _license_text() -> str:
+    """Return the repository LICENSE content when available."""
+    license_path = Path(__file__).resolve().parents[2] / "LICENSE"
+    if license_path.exists():
+        return license_path.read_text(encoding="utf-8")
+    return ""
 
 
 # ---------------------------------------------------------------------------
@@ -378,7 +389,14 @@ streaming = true
 """
 
 
-def _pyproject_toml(approach: int, sha: str, core_url: str) -> str:
+def _pyproject_toml(
+    approach: int,
+    sha: str,
+    core_url: str,
+    *,
+    core_source: str = "git",
+    local_core_path: Path | None = None,
+) -> str:
     stack_deps = (
         '\nlangchain = "==0.3.20"'
         '\nlangchain-core = "==0.3.45"'
@@ -403,6 +421,15 @@ def _pyproject_toml(approach: int, sha: str, core_url: str) -> str:
              "sdlc-pipeline = \"scripts.pipeline_runner:main\"\n"
     )
 
+    if core_source == "git":
+        core_dep = f'sdlc-core = {{git = "{core_url}.git", rev = "{sha}", subdirectory = "core"}}'
+    elif core_source == "local":
+        if local_core_path is None:
+            local_core_path = Path(__file__).resolve().parents[2] / "core"
+        core_dep = f'sdlc-core = {{path = "{local_core_path.resolve().as_posix()}", develop = true}}'
+    else:
+        raise ValueError(f"Unsupported core_source {core_source!r}; expected 'git' or 'local'.")
+
     return f"""\
 [tool.poetry]
 name = "sdlc-hitl-a{approach}"
@@ -413,7 +440,7 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.11"
-sdlc-core = {{git = "{core_url}.git", rev = "{sha}", subdirectory = "core"}}{stack_deps}
+{core_dep}{stack_deps}
 {script_block}
 
 [build-system]
@@ -422,15 +449,41 @@ build-backend = "poetry.core.masonry.api"
 """
 
 
-def _readme(approach: int, sha: str) -> str:
+def _readme(
+    approach: int,
+    sha: str,
+    repo_name: str,
+    *,
+    core_source: str = "git",
+    local_core_path: Path | None = None,
+) -> str:
     approach_desc = _APPROACH_DESCRIPTIONS[approach]
+    repo_slug = repo_name.strip() or f"template-approach{approach}"
+    approach_title = (
+        "Human Orchestrator" if approach == 1 else "Autonomous Pipeline"
+    )
     run_phase_snippet = (
         "poetry run sdlc-hitl-run --phase 2 --agent-role requirements_analyst --artifact-id REQ-01"
         if approach == 1
         else "poetry run sdlc-pipeline --phase 2"
     )
+    if core_source == "git":
+        core_mode_text = (
+            "**Git (portable, recommended)**. This template installs `sdlc-core` "
+            "from a pinned commit and works on any machine without sibling repo layout assumptions."
+        )
+    else:
+        if local_core_path is None:
+            local_core_path = Path(__file__).resolve().parents[2] / "core"
+        core_mode_text = (
+            "**Local path (machine-specific)**. This template points `sdlc-core` to "
+            f"`{local_core_path.resolve().as_posix()}` for rapid local iteration."
+        )
+
     return f"""\
-# AI-Augmented SDLC: Approach {approach}
+# {repo_slug}
+
+Approach {approach} ({approach_title}) for the AI-Augmented SDLC Human-in-the-Loop experiment.
 
 {approach_desc}
 
@@ -447,6 +500,10 @@ cd <this-repo>
 poetry install
 poetry run sdlc-bootstrap --project <project_id>
 ```
+
+## Core Dependency Mode
+
+{core_mode_text}
 
 `sdlc-bootstrap` prepares local config files (`models.toml`, `tooling.toml`,
 `run_config.toml`) and initializes the run database.
@@ -822,7 +879,13 @@ if __name__ == "__main__":
 # Main scaffold logic
 # ---------------------------------------------------------------------------
 
-def _scaffold(approach: int, output: Path) -> None:
+def _scaffold(
+    approach: int,
+    output: Path,
+    *,
+    core_source: str = "git",
+    local_core_path: Path | None = None,
+) -> None:
     if output.exists():
         _die(f"Output directory {output} already exists.  Choose a different path.")
 
@@ -835,9 +898,30 @@ def _scaffold(approach: int, output: Path) -> None:
     _write(output / "models.example.toml", _models_example_toml())
     _write(output / "tooling.example.toml", _tooling_example_toml())
     _write(output / "run_config.example.toml", _run_config_example_toml(approach))
-    _write(output / "pyproject.toml", _pyproject_toml(approach, sha, core_url))
-    _write(output / "README.md", _readme(approach, sha))
+    _write(
+        output / "pyproject.toml",
+        _pyproject_toml(
+            approach,
+            sha,
+            core_url,
+            core_source=core_source,
+            local_core_path=local_core_path,
+        ),
+    )
+    _write(
+        output / "README.md",
+        _readme(
+            approach,
+            sha,
+            output.name,
+            core_source=core_source,
+            local_core_path=local_core_path,
+        ),
+    )
     _write(output / "core_version.txt", sha + "\n")
+    license_text = _license_text()
+    if license_text:
+        _write(output / "LICENSE", license_text)
     _write(output / ".github" / "copilot-instructions.md", _copilot_instructions(approach))
     _write(output / ".github" / "workflows" / "ci.yml", _ci_workflow())
     _write(output / "scripts" / "__init__.py", _scripts_init())
@@ -918,10 +1002,34 @@ def main() -> None:
         type=Path,
         help="Path where the new repository directory will be created.",
     )
+    parser.add_argument(
+        "--core-source",
+        default="git",
+        choices=["git", "local"],
+        help=(
+            "How templates depend on sdlc-core. "
+            "'git' (default) is portable and pinned. "
+            "'local' writes a local path dependency for fast same-machine iteration."
+        ),
+    )
+    parser.add_argument(
+        "--core-path",
+        type=Path,
+        default=None,
+        help=(
+            "Optional path to local core package used when --core-source local. "
+            "Defaults to this repository's ./core path."
+        ),
+    )
     args = parser.parse_args()
 
     approach = int(str(args.approach).lstrip("A"))
-    _scaffold(approach, args.output)
+    _scaffold(
+        approach,
+        args.output,
+        core_source=args.core_source,
+        local_core_path=args.core_path,
+    )
 
 
 if __name__ == "__main__":

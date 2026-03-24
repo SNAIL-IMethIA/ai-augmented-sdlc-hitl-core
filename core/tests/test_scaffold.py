@@ -154,6 +154,21 @@ def test_pyproject_toml_contains_sdlc_core_dep() -> None:
     content = _pyproject_toml(1, "abc123", "https://github.com/OWNER/repo")
     assert "sdlc-core" in content
     assert "abc123" in content
+    assert 'git = "https://github.com/OWNER/repo.git"' in content
+
+
+def test_pyproject_toml_local_core_dep_uses_path() -> None:
+    from sdlc_core.scaffold import _pyproject_toml
+
+    content = _pyproject_toml(
+        1,
+        "abc123",
+        "https://github.com/OWNER/repo",
+        core_source="local",
+        local_core_path=Path("/tmp/local-core"),
+    )
+    assert 'sdlc-core = {path = "/tmp/local-core", develop = true}' in content
+    assert 'git = "https://github.com/OWNER/repo.git"' not in content
 
 
 def test_pyproject_toml_approach2_has_fixed_stack() -> None:
@@ -201,9 +216,25 @@ def test_tooling_example_toml_contains_stack_and_capabilities() -> None:
 def test_readme_contains_approach_description() -> None:
     from sdlc_core.scaffold import _readme
 
-    content = _readme(1, "abc123def456")
+    content = _readme(1, "abc123def456", "project2-approach1-human-orchestrator")
     assert "Approach 1" in content
     assert "abc123def456"[:12] in content
+    assert "project2-approach1-human-orchestrator" in content
+    assert "Git (portable, recommended)" in content
+
+
+def test_readme_local_mode_mentions_core_path() -> None:
+    from sdlc_core.scaffold import _readme
+
+    content = _readme(
+        2,
+        "abc123def456",
+        "project2-approach2-autonomous-pipeline",
+        core_source="local",
+        local_core_path=Path("/opt/exp/core"),
+    )
+    assert "Local path (machine-specific)" in content
+    assert "/opt/exp/core" in content
 
 
 def test_copilot_instructions_approach_specific() -> None:
@@ -255,6 +286,7 @@ def test_scaffold_approach1_creates_required_files(
     assert (output / "run_config.example.toml").exists()
     assert (output / "pyproject.toml").exists()
     assert (output / "README.md").exists()
+    assert (output / "LICENSE").exists()
     assert (output / "core_version.txt").exists()
     assert (output / ".github" / "copilot-instructions.md").exists()
     assert (output / ".github" / "workflows" / "ci.yml").exists()
@@ -404,3 +436,22 @@ def test_main_rejects_invalid_approach(tmp_path: Path) -> None:
 
         with pytest.raises(SystemExit):
             main()
+
+
+def test_main_accepts_core_source_local(tmp_path: Path, _mock_git: None) -> None:
+    output = tmp_path / "repo-local"
+    test_args = [
+        "sdlc-scaffold",
+        "--approach", "1",
+        "--output", str(output),
+        "--core-source", "local",
+        "--core-path", "/tmp/local-core",
+    ]
+
+    with patch("sys.argv", test_args):
+        from sdlc_core.scaffold import main
+
+        main()
+
+    pyproject = (output / "pyproject.toml").read_text(encoding="utf-8")
+    assert 'sdlc-core = {path = "/tmp/local-core", develop = true}' in pyproject
