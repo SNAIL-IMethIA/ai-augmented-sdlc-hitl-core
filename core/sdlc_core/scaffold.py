@@ -889,6 +889,22 @@ def _scaffold(
     if output.exists():
         _die(f"Output directory {output} already exists.  Choose a different path.")
 
+    # Fail fast with a clear message when users pass placeholder paths like
+    # "/path/..." or any location they cannot create.
+    parent = output.parent
+    try:
+        parent.mkdir(parents=True, exist_ok=True)
+    except PermissionError:
+        _die(
+            f"Cannot create output directory under {parent.resolve()}.\n"
+            "Choose a writable path (for example: ./project2-approach1-human-orchestrator)."
+        )
+    except FileNotFoundError:
+        _die(
+            f"Parent path does not exist: {parent}.\n"
+            "Use a real path on your machine instead of a placeholder like '/path/...'."
+        )
+
     sha = _get_core_sha()
     core_url = _get_core_repo_url()
 
