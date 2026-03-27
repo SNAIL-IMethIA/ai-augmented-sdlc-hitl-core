@@ -1,5 +1,5 @@
 -- Canonical schema for the AI-Augmented SDLC experiment database.
--- One database file per approach × project run.
+-- One database file for each approach and project run.
 -- Applied by sdlc_core.db.setup_db().
 --
 -- Foreign key enforcement must be enabled at connection time:
@@ -7,15 +7,15 @@
 
 -- ---------------------------------------------------------------------------
 -- runs
--- One row per approach × project execution.
--- Opened before Phase 2 begins; closed when the run terminates.
+-- One row for each approach and project execution.
+-- Opened before Phase 2 begins and closed when the run terminates.
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS runs (
     id              TEXT    PRIMARY KEY,   -- e.g. "run-proj1-approach2-20260310"
     project         TEXT    NOT NULL,      -- e.g. "project1"
     approach        INTEGER NOT NULL CHECK (approach IN (1, 2)),
     started_at      TEXT    NOT NULL,      -- ISO 8601
-    ended_at        TEXT,                  -- ISO 8601; NULL while in progress
+    ended_at        TEXT,                  -- ISO 8601. NULL while in progress.
     terminal_phase  INTEGER CHECK (terminal_phase BETWEEN 2 AND 8)
 );
 
@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS sessions (
     run_id          TEXT    NOT NULL REFERENCES runs (id),
     session_number  INTEGER NOT NULL CHECK (session_number IN (1, 2, 3)),
     started_at      TEXT    NOT NULL,      -- ISO 8601
-    ended_at        TEXT,                  -- ISO 8601; NULL while session is open
+    ended_at        TEXT,                  -- ISO 8601. NULL while session is open.
     UNIQUE (run_id, session_number)
 );
 
@@ -43,15 +43,15 @@ CREATE TABLE IF NOT EXISTS phase_progress (
     status          TEXT    NOT NULL CHECK (status IN (
                         'not_started', 'in_progress', 'completed', 'partially_reached'
                     )),
-    entered_at      TEXT,                  -- ISO 8601; NULL if not yet started
-    completed_at    TEXT,                  -- ISO 8601; NULL if not yet complete
+    entered_at      TEXT,                  -- ISO 8601. NULL if not yet started.
+    completed_at    TEXT,                  -- ISO 8601. NULL if not yet complete.
     PRIMARY KEY (run_id, phase_number)
 );
 
 -- ---------------------------------------------------------------------------
 -- artifacts
 -- One row per accepted SDLC artifact.
--- Artifacts that are never accepted do not appear here; rejection is
+-- Artifacts that are never accepted do not appear here. Rejection is
 -- captured in interactions via outcome = 'rejected'.
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS artifacts (
@@ -68,8 +68,8 @@ CREATE TABLE IF NOT EXISTS artifacts (
 
 -- ---------------------------------------------------------------------------
 -- interactions
--- One row per prompt–response exchange (human-initiated or agent-to-agent).
--- Primary log table; main source for effort, iteration, and modification
+-- One row per prompt-response exchange (human-initiated or agent-to-agent).
+-- Primary log table. Main source for effort, iteration, and modification
 -- metrics.
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS interactions (

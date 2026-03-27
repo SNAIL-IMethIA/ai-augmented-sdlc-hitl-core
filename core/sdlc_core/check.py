@@ -238,7 +238,10 @@ def g6_unique_artifact_ids_per_run(conn: sqlite3.Connection) -> CheckResult:
     ).fetchall()
     if not rows:
         return _check("G6", "Artifact IDs are unique within each run", True)
-    detail = "; ".join(f"{r['run_id']}/{r['id']} (×{r['cnt']})" for r in rows)
+    detail = "; ".join(
+        f"{r['run_id']}/{r['id']} (count={r['cnt']})"
+        for r in rows
+    )
     return _check(
         "G6",
         "Artifact IDs are unique within each run",

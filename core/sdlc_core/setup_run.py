@@ -10,7 +10,7 @@ Initialises a new experiment run in a template repository:
 5. Calls ``open_run()`` to insert the run record.
 6. Prints a confirmation table.
 
-This command is run once per approach × project run, before Phase 2 starts.
+This command is run once for each approach and project run, before Phase 2 starts.
 It is idempotent: calling it a second time with the same run_config.toml
 will reuse the existing run record if the run ID is already present.
 """
