@@ -56,6 +56,12 @@ def _validate_model(model_name: str, models_data: dict[str, Any]) -> None:
             f"Available models: {available}"
         )
     entry: dict[str, Any] = models_section[model_name]
+    provider_name = str(entry.get("provider", "")).strip().lower()
+    if model_name.lower() == "manual" or provider_name == "manual":
+        _die(
+            f"Model {model_name!r} uses provider 'manual', which is disallowed "
+            "by protocol. Use a valid AI model provider."
+        )
     api_key_env: str = entry.get("api_key_env", "")
     if api_key_env and not os.environ.get(api_key_env):
         _die(

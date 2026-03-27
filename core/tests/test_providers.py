@@ -10,7 +10,6 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from sdlc_core.providers.base import ModelProvider
-from sdlc_core.providers.manual import ManualProvider
 
 # ---------------------------------------------------------------------------
 # ModelProvider Protocol
@@ -39,81 +38,6 @@ def test_class_without_correct_signature_can_still_satisfy_protocol() -> None:
             return ""
 
     assert isinstance(_Bare(), ModelProvider)
-
-
-# ---------------------------------------------------------------------------
-# ManualProvider
-# ---------------------------------------------------------------------------
-
-
-def test_manual_provider_returns_input(monkeypatch: pytest.MonkeyPatch) -> None:
-    responses = iter(["This is the response.", "", "END"])
-    monkeypatch.setattr("builtins.input", lambda: next(responses))
-    result = ManualProvider().complete("Test prompt")
-    assert result == "This is the response."
-
-
-def test_manual_provider_empty_response_placeholder(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr("builtins.input", lambda: "END")
-    result = ManualProvider().complete("Test prompt")
-    assert result == "[no response recorded]"
-
-
-def test_manual_provider_multiline_response(monkeypatch: pytest.MonkeyPatch) -> None:
-    lines = iter(["line 1", "line 2", "line 3", "END"])
-    monkeypatch.setattr("builtins.input", lambda: next(lines))
-    result = ManualProvider().complete("prompt")
-    assert result == "line 1\nline 2\nline 3"
-
-
-def test_manual_provider_prints_system_label(
-    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setattr("builtins.input", lambda: "END")
-    ManualProvider().complete("The prompt", system="Be concise and helpful.")
-    out = capsys.readouterr().out
-    assert "SYSTEM" in out
-    assert "Be concise and helpful." in out
-
-
-def test_manual_provider_prints_prompt(
-    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setattr("builtins.input", lambda: "END")
-    ManualProvider().complete("Unique-prompt-text-XYZ")
-    out = capsys.readouterr().out
-    assert "Unique-prompt-text-XYZ" in out
-
-
-def test_manual_provider_prints_sentinel_instructions(
-    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setattr("builtins.input", lambda: "END")
-    ManualProvider().complete("prompt")
-    out = capsys.readouterr().out
-    assert "END" in out
-
-
-def test_manual_provider_ignores_kwargs(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("builtins.input", lambda: "END")
-    # Should not raise even with arbitrary kwargs.
-    ManualProvider().complete("prompt", temperature=0.5, max_tokens=100)
-
-
-def test_manual_provider_satisfies_protocol() -> None:
-    assert isinstance(ManualProvider(), ModelProvider)
-
-
-def test_manual_provider_no_system(
-    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setattr("builtins.input", lambda: "END")
-    ManualProvider().complete("prompt")
-    out = capsys.readouterr().out
-    # System section should not appear when system is None.
-    assert "SYSTEM" not in out
 
 
 # ---------------------------------------------------------------------------
@@ -239,19 +163,6 @@ def test_get_provider_ollama(
     assert isinstance(provider, OllamaProvider)
 
 
-def test_get_provider_manual(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    toml = tmp_path / "models.toml"
-    toml.write_text(
-        '[models.manual]\nprovider = "manual"\n', encoding="utf-8"
-    )
-    monkeypatch.setenv("SDLC_MODELS_TOML", str(toml))
-    from sdlc_core.providers.registry import get_provider
-
-    assert isinstance(get_provider("manual"), ManualProvider)
-
-
 def test_get_provider_with_api_base(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -325,7 +236,7 @@ def test_load_models_toml_custom_env_var(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     custom = tmp_path / "custom.toml"
-    custom.write_text('[models.x]\nprovider = "manual"\n', encoding="utf-8")
+    custom.write_text('[models.x]\nprovider = "ollama"\n', encoding="utf-8")
     monkeypatch.setenv("SDLC_MODELS_TOML", str(custom))
     from sdlc_core.providers.registry import _load_models_toml
 
@@ -379,12 +290,6 @@ def test_providers_package_exports_model_provider() -> None:
     import sdlc_core.providers as pkg
 
     assert hasattr(pkg, "ModelProvider")
-
-
-def test_providers_package_exports_manual_provider() -> None:
-    import sdlc_core.providers as pkg
-
-    assert hasattr(pkg, "ManualProvider")
 
 
 def test_providers_package_exports_get_provider() -> None:

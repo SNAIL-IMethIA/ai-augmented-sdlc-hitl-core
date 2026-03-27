@@ -13,7 +13,6 @@ Provider resolution
 Built-in provider keys
 ----------------------
 ``"ollama"``  → :class:`sdlc_core.providers.ollama.OllamaProvider`
-``"manual"``  → :class:`sdlc_core.providers.manual.ManualProvider`
 
 Registering a custom provider (decorator style)
 ------------------------------------------------
@@ -68,15 +67,8 @@ def _ollama_class() -> type:
     from sdlc_core.providers.ollama import OllamaProvider
     return OllamaProvider
 
-
-def _manual_class() -> type:
-    from sdlc_core.providers.manual import ManualProvider
-    return ManualProvider
-
-
 PROVIDER_CLASSES: dict[str, Any] = {
     "ollama": _ollama_class,
-    "manual": _manual_class,
 }
 
 
@@ -171,7 +163,7 @@ def get_provider(model_name: str) -> ModelProvider:
 
     Args:
         model_name: Key under ``[models]`` in ``models.toml``,
-                    e.g. ``"llama3"`` or ``"manual"``.
+                    e.g. ``"llama3"``.
 
     Returns:
         An object satisfying :class:`~sdlc_core.providers.base.ModelProvider`.
@@ -223,8 +215,7 @@ def get_provider(model_name: str) -> ModelProvider:
     if api_base:
         init_kwargs["api_base"] = api_base
 
-    # Constructors that don't accept these kwargs (e.g. ManualProvider)
-    # will receive nothing and the kwargs dict will be empty for them
+    # Constructors that don't accept standard kwargs will receive no kwargs.
     if not init_kwargs:
         return cls()  # type: ignore[no-any-return]
 

@@ -80,7 +80,7 @@ def test_prompt_stub_approach1_contains_phase_name() -> None:
     from sdlc_core.scaffold import _prompt_stub
 
     stub = _prompt_stub(1, 2)
-    assert "Stakeholder Requirements Definition" in stub
+    assert "System Requirements Definition" in stub
     assert "Phase 2" in stub
     assert "Persona" in stub
 
@@ -129,7 +129,7 @@ def test_models_example_toml_contains_ollama_section() -> None:
 
     content = _models_example_toml()
     assert "ollama" in content
-    assert "manual" in content
+    assert "[models.manual]" not in content
 
 
 def test_run_config_example_approach1_uses_llama3() -> None:

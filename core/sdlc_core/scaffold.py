@@ -122,13 +122,13 @@ _APPROACH_DESCRIPTIONS = {
 }
 
 _PHASE_NAMES = {
-    2: "Stakeholder Requirements Definition",
-    3: "System Requirements Analysis",
-    4: "Architecture Design",
-    5: "Detailed Design",
-    6: "Implementation",
-    7: "Verification",
-    8: "Validation",
+    2: "System Requirements Definition",
+    3: "Architecture Definition",
+    4: "Design Definition",
+    5: "Implementation",
+    6: "Verification",
+    7: "Validation",
+    8: "Transition",
 }
 
 
@@ -263,12 +263,18 @@ def _models_example_toml() -> str:
 # Each [[models.<name>]] entry defines one model you can assign to a phase
 # Use the name in run_config.toml, for example phase2 = "llama3-local"
 #
-# provider    -> built-in key ("ollama" or "manual") or a registered custom key
+# provider    -> built-in key ("ollama") or a registered custom key
 # model_id    -> the model identifier string the API expects
 # api_key_env -> name of the environment variable holding the API key
 #               Leave empty for local models that need no key
 # api_base    -> override the API endpoint (for non-default Ollama ports, vLLM, etc)
 #               Leave empty to use the provider default
+#
+# Startup checks (run by poetry run sdlc-setup before any experiment DB/run is created)
+# startup_check_prompt  -> optional probe prompt (defaults to "Respond with exactly: ok")
+# startup_check_system  -> optional system message for the probe
+# startup_check_*       -> any additional startup check kwargs passed to provider.complete()
+#                         Example: startup_check_max_tokens = 8
 # -------------------------------------------------------------------------------
 
 # -- Ollama via LangChain (recommended: integrates with LangGraph natively) ---
@@ -277,8 +283,9 @@ def _models_example_toml() -> str:
 provider    = "ollama-lc"
 model_id    = "llama3"
 api_key_env = ""
-# defaults to http://localhost:11434
+# defaults to http://localhost:11500
 api_base    = ""
+startup_check_max_tokens = 8
 
 [models.codellama-local]
 provider    = "ollama-lc"
@@ -299,14 +306,6 @@ api_base    = ""
 # model_id    = "llama3"
 # api_key_env = ""
 # api_base    = ""
-
-# -- Manual / HITL (for any phase done by hand) ---------------------------------
-
-[models.manual]
-provider    = "manual"
-model_id    = ""
-api_key_env = ""
-api_base    = ""
 
 # -- Commercial providers (require registering the example extension first) -----
 # See sdlc_core/providers/examples/ for the provider class and registration
@@ -346,16 +345,17 @@ project    = ""          # e.g. "project1"
 approach   = "A{approach}"
 
 [phases]
-# Assign a model name from models.toml to each phase
-# Use "manual" for any phase you run by hand (Approach 1 uses this for all)
+# Assign a model name from models.toml to each phase.
+# Per protocol, every phase must declare a valid configured model.
+# sdlc-setup fails fast on missing, invalid, or unreachable model assignments.
 
-phase2 = "{example_model}"   # {_PHASE_NAMES[2]}
-phase3 = "{example_model}"   # {_PHASE_NAMES[3]}
-phase4 = "{example_model}"   # {_PHASE_NAMES[4]}
-phase5 = "{example_model}"   # {_PHASE_NAMES[5]}
-phase6 = "{example_model}"   # {_PHASE_NAMES[6]}
-phase7 = "{example_model}"   # {_PHASE_NAMES[7]}
-phase8 = "{example_model}"   # {_PHASE_NAMES[8]}
+phase2 = "{example_model}"   # System Requirements Definition
+phase3 = "{example_model}"   # Architecture Definition
+phase4 = "{example_model}"   # Design Definition
+phase5 = "{example_model}"   # Implementation
+phase6 = "{example_model}"   # Verification
+phase7 = "{example_model}"   # Validation
+phase8 = "{example_model}"   # Transition
 """
 
 
@@ -426,7 +426,7 @@ def _pyproject_toml(
     elif core_source == "local":
         if local_core_path is None:
             local_core_path = Path(__file__).resolve().parents[2] / "core"
-        core_dep = f'sdlc-core = {{path = "{local_core_path.resolve().as_posix()}", develop = true}}'
+        core_dep = f'sdlc-core = {{path = "{local_core_path.resolve().as_posix()}", develop = true}}' # NOQA 501
     else:
         raise ValueError(f"Unsupported core_source {core_source!r}; expected 'git' or 'local'.")
 
@@ -583,8 +583,29 @@ in `artifacts/phase<N>/`.  All interactions are logged to `logs/experiment.db`.
 
 | Command | Purpose |
 |---|---|
-| `poetry run sdlc-setup` | Initialise DB and open run record (run once) |
+| `poetry run sdlc-setup` | Validate model config/connectivity, then open the run |
 | `poetry run sdlc-assign-model` | Reassign a model for a phase mid-run |
+
+## Setup gate (must pass before the experiment starts)
+
+- Every phase 2..8 in `run_config.toml` must have a model assigned.
+- Assigned model names must exist under `[models.*]` in `models.toml`.
+- `sdlc-setup` runs startup checks for all assigned models and fails on unreachable/invalid models.
+- If setup fails, no experiment DB/run record should be considered valid for execution.
+
+## Approach execution ownership
+
+- Approach 1: human orchestrates each interaction; model outputs are still AI-generated and logged.
+- Approach 2: pipeline drives phase execution with logged events and gated handoffs.
+
+## Handoff note for the next conversation
+
+When starting a new chat in this template repo, include:
+
+1. Approach (`A1` or `A2`) and project ID.
+2. Confirm `poetry run sdlc-setup` has passed.
+3. Current phase and artifact ID(s) being worked.
+4. Any protocol deviations to track explicitly.
 
 ## Files not to modify during a run
 
@@ -640,7 +661,7 @@ def _scripts_init() -> str:
 
 
 def _bootstrap_py(approach: int) -> str:
-    default_model = "manual" if approach == 1 else "llama3-local"
+    default_model = "llama3-local"
     return f"""\
 from __future__ import annotations
 

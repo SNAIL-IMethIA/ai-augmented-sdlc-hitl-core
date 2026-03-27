@@ -145,7 +145,15 @@ def test_validate_models_happy_path(monkeypatch: pytest.MonkeyPatch) -> None:
     run_cfg = {
         "project": "p",
         "approach": "A1",
-        "phases": {"phase2": "m", "phase3": "m"},
+        "phases": {
+            "phase2": "m",
+            "phase3": "m",
+            "phase4": "m",
+            "phase5": "m",
+            "phase6": "m",
+            "phase7": "m",
+            "phase8": "m",
+        },
     }
     phase_map = _validate_models(
         run_cfg, {"models": {"m": {"api_key_env": "MY_KEY"}}}
@@ -154,13 +162,43 @@ def test_validate_models_happy_path(monkeypatch: pytest.MonkeyPatch) -> None:
     assert phase_map[3] == "m"
 
 
+def test_validate_models_manual_provider_disallowed_exits() -> None:
+    from sdlc_core.setup_run import _validate_models
+
+    run_cfg = {
+        "project": "p",
+        "approach": "A1",
+        "phases": {"phase2": "xyz"},
+    }
+    with pytest.raises(SystemExit):
+        _validate_models(
+            run_cfg,
+            {
+                "models": {
+                    "xyz": {
+                        "provider": "manual",
+                        "api_key_env": "",
+                    }
+                }
+            },
+        )
+
+
 def test_validate_models_no_api_key_env() -> None:
     from sdlc_core.setup_run import _validate_models
 
     run_cfg = {
         "project": "p",
         "approach": "A1",
-        "phases": {"phase2": "localmodel"},
+        "phases": {
+            "phase2": "localmodel",
+            "phase3": "localmodel",
+            "phase4": "localmodel",
+            "phase5": "localmodel",
+            "phase6": "localmodel",
+            "phase7": "localmodel",
+            "phase8": "localmodel",
+        },
     }
     phase_map = _validate_models(
         run_cfg, {"models": {"localmodel": {"api_key_env": ""}}}
@@ -168,9 +206,7 @@ def test_validate_models_no_api_key_env() -> None:
     assert phase_map[2] == "localmodel"
 
 
-def test_validate_models_unassigned_phase_warns(
-    capsys: pytest.CaptureFixture[str],
-) -> None:
+def test_validate_models_unassigned_phase_exits() -> None:
     from sdlc_core.setup_run import _validate_models
 
     run_cfg = {
@@ -178,9 +214,54 @@ def test_validate_models_unassigned_phase_warns(
         "approach": "A1",
         "phases": {},
     }
-    _validate_models(run_cfg, {"models": {}})
-    err = capsys.readouterr().err
-    assert "WARNING" in err
+    with pytest.raises(SystemExit):
+        _validate_models(run_cfg, {"models": {}})
+
+
+# ---------------------------------------------------------------------------
+# _validate_model_connectivity
+# ---------------------------------------------------------------------------
+
+
+def test_validate_model_connectivity_happy_path() -> None:
+    from sdlc_core.setup_run import _validate_model_connectivity
+
+    provider = MagicMock()
+    provider.complete.return_value = "ok"
+    with patch("sdlc_core.setup_run.get_provider", return_value=provider):
+        _validate_model_connectivity(
+            {2: "m", 3: "m"},
+            {
+                "models": {
+                    "m": {
+                        "provider": "ollama",
+                        "model_id": "llama3",
+                        "startup_check_prompt": "ping",
+                        "startup_check_max_tokens": 8,
+                    }
+                }
+            },
+        )
+
+    provider.complete.assert_called_once_with("ping", system=None, max_tokens=8)
+
+
+def test_validate_model_connectivity_provider_failure_exits() -> None:
+    from sdlc_core.setup_run import _validate_model_connectivity
+
+    with patch("sdlc_core.setup_run.get_provider", side_effect=RuntimeError("offline")):
+        with pytest.raises(SystemExit):
+            _validate_model_connectivity({2: "m"}, {"models": {"m": {}}})
+
+
+def test_validate_model_connectivity_empty_response_exits() -> None:
+    from sdlc_core.setup_run import _validate_model_connectivity
+
+    provider = MagicMock()
+    provider.complete.return_value = ""
+    with patch("sdlc_core.setup_run.get_provider", return_value=provider):
+        with pytest.raises(SystemExit):
+            _validate_model_connectivity({2: "m"}, {"models": {"m": {}}})
 
 
 # ---------------------------------------------------------------------------
@@ -300,7 +381,14 @@ def test_main_success_prints_run_id(
     run_cfg = tmp_path / "run_config.toml"
     run_cfg.write_text(
         '[run]\nproject = "proj1"\napproach = "A2"\n'
-        '[phases]\nphase2 = "localmodel"\n',
+        '[phases]\n'
+        'phase2 = "localmodel"\n'
+        'phase3 = "localmodel"\n'
+        'phase4 = "localmodel"\n'
+        'phase5 = "localmodel"\n'
+        'phase6 = "localmodel"\n'
+        'phase7 = "localmodel"\n'
+        'phase8 = "localmodel"\n',
         encoding="utf-8",
     )
     models = tmp_path / "models.toml"
@@ -317,6 +405,7 @@ def test_main_success_prints_run_id(
         patch("sdlc_core.setup_run.setup_db", return_value=fake_db),
         patch("sdlc_core.setup_run.open_run", return_value="run-XYZ"),
         patch("sdlc_core.setup_run._resolve_sha", return_value="abc123"),
+        patch("sdlc_core.setup_run._validate_model_connectivity"),
     ):
         from sdlc_core.setup_run import main
 
@@ -334,11 +423,22 @@ def test_main_approach_int_resolves(
     run_cfg = tmp_path / "run_config.toml"
     # approach as integer 1, not string
     run_cfg.write_text(
-        '[run]\nproject = "p"\napproach = 1\n',
+        '[run]\nproject = "p"\napproach = 1\n'
+        '[phases]\n'
+        'phase2 = "localmodel"\n'
+        'phase3 = "localmodel"\n'
+        'phase4 = "localmodel"\n'
+        'phase5 = "localmodel"\n'
+        'phase6 = "localmodel"\n'
+        'phase7 = "localmodel"\n'
+        'phase8 = "localmodel"\n',
         encoding="utf-8",
     )
     models = tmp_path / "models.toml"
-    models.write_text("[models]\n", encoding="utf-8")
+    models.write_text(
+        '[models.localmodel]\nprovider = "ollama"\nmodel_id = "llama3"\n',
+        encoding="utf-8",
+    )
 
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("SDLC_MODELS_TOML", str(models))
@@ -348,6 +448,7 @@ def test_main_approach_int_resolves(
         patch("sdlc_core.setup_run.setup_db", return_value=fake_db),
         patch("sdlc_core.setup_run.open_run", return_value="run-001"),
         patch("sdlc_core.setup_run._resolve_sha", return_value="sha"),
+        patch("sdlc_core.setup_run._validate_model_connectivity"),
     ):
         from sdlc_core.setup_run import main
 

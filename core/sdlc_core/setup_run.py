@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import Any
 
 from sdlc_core.db import open_run, setup_db
+from sdlc_core.providers.registry import get_provider
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -31,6 +32,11 @@ from sdlc_core.db import open_run, setup_db
 
 _REQUIRED_RUN_FIELDS: tuple[str, ...] = ("project", "approach")
 _PHASES: tuple[int, ...] = (2, 3, 4, 5, 6, 7, 8)
+_STARTUP_CHECK_DEFAULT_PROMPT = "Respond with exactly: ok"
+_STARTUP_CHECK_RESERVED_KEYS: tuple[str, ...] = (
+    "startup_check_prompt",
+    "startup_check_system",
+)
 
 
 def _load_toml(path: Path, label: str) -> dict[str, Any]:
@@ -85,7 +91,9 @@ def _validate_models(run_cfg: dict[str, Any], models_data: dict[str, Any]) -> di
         key = f"phase{phase}"
         model_name: str = phases_section.get(key, "").strip()
         if not model_name:
-            _warn(f"No model assigned for phase {phase} (key '{key}' is empty).")
+            errors.append(
+                f"  - Phase {phase}: no model assigned (key '{key}' is empty)."
+            )
             continue
 
         if model_name not in models_section:
@@ -95,6 +103,15 @@ def _validate_models(run_cfg: dict[str, Any], models_data: dict[str, Any]) -> di
             continue
 
         entry: dict[str, Any] = models_section[model_name]
+        provider_name = str(entry.get("provider", "")).strip().lower()
+        if model_name.lower() == "manual" or provider_name == "manual":
+            errors.append(
+                f"  - Phase {phase}: model {model_name!r} uses provider 'manual', "
+                "which is disallowed by protocol. Every phase must use a valid "
+                "AI model provider."
+            )
+            continue
+
         api_key_env: str = entry.get("api_key_env", "")
         if api_key_env and not os.environ.get(api_key_env):
             errors.append(
@@ -110,6 +127,54 @@ def _validate_models(run_cfg: dict[str, Any], models_data: dict[str, Any]) -> di
         )
 
     return phase_map
+
+
+def _startup_check_kwargs(model_entry: dict[str, Any]) -> dict[str, Any]:
+    """Return provider kwargs derived from ``startup_check_*`` config keys."""
+    kwargs: dict[str, Any] = {}
+    for key, value in model_entry.items():
+        if not key.startswith("startup_check_"):
+            continue
+        if key in _STARTUP_CHECK_RESERVED_KEYS:
+            continue
+        kwargs[key.removeprefix("startup_check_")] = value
+    return kwargs
+
+
+def _validate_model_connectivity(
+    phase_map: dict[int, str],
+    models_data: dict[str, Any],
+) -> None:
+    """Fail fast when any assigned model cannot be instantiated and called.
+
+    This runs before any experiment DB or run record is created.
+    """
+    models_section: dict[str, Any] = models_data.get("models", {})
+    # Keep deterministic order and test each configured model once.
+    used_models = list(dict.fromkeys(phase_map[phase] for phase in sorted(phase_map)))
+
+    errors: list[str] = []
+    for model_name in used_models:
+        entry = models_section.get(model_name, {})
+        prompt = str(entry.get("startup_check_prompt", _STARTUP_CHECK_DEFAULT_PROMPT))
+        system_raw = entry.get("startup_check_system", "")
+        system = str(system_raw).strip() or None
+        kwargs = _startup_check_kwargs(entry)
+
+        try:
+            provider = get_provider(model_name)
+            response = provider.complete(prompt, system=system, **kwargs)
+            if not str(response).strip():
+                raise ValueError("startup check returned an empty response")
+        except Exception as exc:
+            errors.append(f"  - Model {model_name!r}: {type(exc).__name__}: {exc}")
+
+    if errors:
+        _die(
+            "Startup model connectivity checks failed. "
+            "Fix model/provider configuration before running sdlc-setup:\n"
+            + "\n".join(errors)
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -171,6 +236,7 @@ def main() -> None:
 
     run_section = _validate_run_config(run_data)
     phase_map = _validate_models(run_data, models_data)
+    _validate_model_connectivity(phase_map, models_data)
 
     sha = _write_core_version()
 

@@ -114,6 +114,20 @@ def test_validate_model_no_key_env() -> None:
     _validate_model("local", {"models": {"local": {"api_key_env": ""}}})
 
 
+def test_validate_model_manual_provider_disallowed_exits() -> None:
+    from sdlc_core.assign_model import _validate_model
+
+    with pytest.raises(SystemExit):
+        _validate_model("x", {"models": {"x": {"provider": "manual"}}})
+
+
+def test_validate_model_manual_name_disallowed_exits() -> None:
+    from sdlc_core.assign_model import _validate_model
+
+    with pytest.raises(SystemExit):
+        _validate_model("manual", {"models": {"manual": {"provider": "ollama"}}})
+
+
 def test_validate_model_no_entry_shows_available(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -142,7 +156,7 @@ def test_main_run_id_not_found(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     toml = tmp_path / "models.toml"
-    toml.write_text('[models.manual]\nprovider = "manual"\n', encoding="utf-8")
+    toml.write_text('[models.localmodel]\nprovider = "ollama"\n', encoding="utf-8")
     monkeypatch.setenv("SDLC_MODELS_TOML", str(toml))
     monkeypatch.chdir(tmp_path)
     _setup_db_and_run(tmp_path)
@@ -151,7 +165,7 @@ def test_main_run_id_not_found(
         "sdlc-assign-model",
         "--run-id", "nonexistent-run",
         "--phase", "3",
-        "--model", "manual",
+        "--model", "localmodel",
     ]
     with patch("sys.argv", test_args):
         from sdlc_core.assign_model import main
@@ -164,7 +178,7 @@ def test_main_success_writes_violation(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     toml = tmp_path / "models.toml"
-    toml.write_text('[models.manual]\nprovider = "manual"\n', encoding="utf-8")
+    toml.write_text('[models.localmodel]\nprovider = "ollama"\n', encoding="utf-8")
     monkeypatch.setenv("SDLC_MODELS_TOML", str(toml))
     # Point _connect at our tmp DB.
     monkeypatch.setenv("SDLC_DB_PATH", str(tmp_path / "logs" / "experiment.db"))
@@ -176,7 +190,7 @@ def test_main_success_writes_violation(
         "sdlc-assign-model",
         "--run-id", run_id,
         "--phase", "4",
-        "--model", "manual",
+        "--model", "localmodel",
     ]
     with patch("sys.argv", test_args):
         from sdlc_core.assign_model import main
@@ -193,14 +207,14 @@ def test_main_success_writes_violation(
     ).fetchall()
     conn.close()
     assert len(rows) == 1
-    assert "manual" in rows[0][4]  # detail column (index 4) contains model name
+    assert "localmodel" in rows[0][4]  # detail column (index 4) contains model name
 
 
 def test_main_invalid_phase_rejected(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     toml = tmp_path / "models.toml"
-    toml.write_text('[models.manual]\nprovider = "manual"\n', encoding="utf-8")
+    toml.write_text('[models.localmodel]\nprovider = "ollama"\n', encoding="utf-8")
     monkeypatch.setenv("SDLC_MODELS_TOML", str(toml))
     monkeypatch.chdir(tmp_path)
 
@@ -208,7 +222,7 @@ def test_main_invalid_phase_rejected(
         "sdlc-assign-model",
         "--run-id", "any",
         "--phase", "99",  # out of 2-8 range
-        "--model", "manual",
+        "--model", "localmodel",
     ]
     with patch("sys.argv", test_args):
         from sdlc_core.assign_model import main
@@ -221,7 +235,7 @@ def test_main_model_not_in_toml_exits(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     toml = tmp_path / "models.toml"
-    toml.write_text('[models.manual]\nprovider = "manual"\n', encoding="utf-8")
+    toml.write_text('[models.localmodel]\nprovider = "ollama"\n', encoding="utf-8")
     monkeypatch.setenv("SDLC_MODELS_TOML", str(toml))
     monkeypatch.chdir(tmp_path)
     _setup_db_and_run(tmp_path)

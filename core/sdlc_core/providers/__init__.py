@@ -3,7 +3,6 @@
 Public surface
 --------------
 - ``ModelProvider``: Protocol every provider must satisfy.
-- ``ManualProvider``: HITL provider that routes through the researcher's terminal (Approach 1).
 - ``OllamaProvider``: Default provider for locally-hosted models via Ollama.
 - ``LangChainProvider``: Bridge wrapping any LangChain ``BaseChatModel`` (recommended for
   LangGraph integration; ``ChatOllama`` is the default, swap to any other chat model).
@@ -44,14 +43,12 @@ from __future__ import annotations
 from sdlc_core.providers.base import ModelProvider
 from sdlc_core.providers.intervention import InterventionLogger
 from sdlc_core.providers.logged import LoggedProvider
-from sdlc_core.providers.manual import ManualProvider
 from sdlc_core.providers.registry import get_provider, register_provider
 
 __all__ = [
     "InterventionLogger",
     "LangChainProvider",
     "LoggedProvider",
-    "ManualProvider",
     "ModelProvider",
     "OllamaProvider",
     "get_provider",
