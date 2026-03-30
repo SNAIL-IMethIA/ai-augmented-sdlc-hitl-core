@@ -398,17 +398,17 @@ def _pyproject_toml(
     local_core_path: Path | None = None,
 ) -> str:
     stack_deps = (
-        '\nlangchain = "==0.3.20"'
-        '\nlangchain-core = "==0.3.45"'
-        '\nlangchain-community = "==0.3.19"'
-        '\nlangchain-ollama = "==0.2.3"'
-        '\nlanggraph = "==0.2.74"'
-        '\nlangsmith = "==0.2.19"'
+        '\nlangchain = "==1.2.13"'
+        '\nlangchain-core = "==1.2.22"'
+        '\nlangchain-community = "==0.4.1"'
+        '\nlangchain-ollama = "==1.0.1"'
+        '\nlanggraph = "==1.1.3"'
+        '\nlangsmith = "==0.7.22"'
     )
     if approach == 2:
         stack_deps += (
-            '\nautogen-agentchat = "==0.4.9"'
-            '\nautogen-ext = "==0.4.9"'
+            '\nautogen-agentchat = "==0.7.5"'
+            '\nautogen-ext = "==0.7.5"'
         )
 
     script_block = (
@@ -437,6 +437,7 @@ version = "0.1.0"
 description = "AI-Augmented SDLC, Approach {approach}: {_APPROACH_DESCRIPTIONS[approach]}"
 authors = []
 readme = "README.md"
+package-mode = false
 
 [tool.poetry.dependencies]
 python = "^3.11"
@@ -642,7 +643,7 @@ jobs:
         run: pip install poetry
 
       - name: Install dependencies
-        run: poetry install
+                run: poetry install --no-root
 
       - name: Run integrity check
         run: |

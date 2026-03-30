@@ -179,11 +179,11 @@ def test_pyproject_toml_approach2_has_fixed_stack() -> None:
     assert 'rev = "sha", subdirectory = "core"}' in content
     assert 'sdlc-bootstrap = "scripts.bootstrap:main"' in content
     assert 'sdlc-pipeline = "scripts.pipeline_runner:main"' in content
-    assert 'langchain = "==0.3.20"' in content
-    assert 'langchain-ollama = "==0.2.3"' in content
-    assert 'langgraph = "==0.2.74"' in content
-    assert 'langsmith = "==0.2.19"' in content
-    assert 'autogen-agentchat = "==0.4.9"' in content
+    assert 'langchain = "==1.2.13"' in content
+    assert 'langchain-ollama = "==1.0.1"' in content
+    assert 'langgraph = "==1.1.3"' in content
+    assert 'langsmith = "==0.7.22"' in content
+    assert 'autogen-agentchat = "==0.7.5"' in content
 
 
 def test_pyproject_toml_approach1_has_fixed_base_stack() -> None:
@@ -192,11 +192,11 @@ def test_pyproject_toml_approach1_has_fixed_base_stack() -> None:
     content = _pyproject_toml(1, "sha", "https://github.com/OWNER/repo")
     assert 'sdlc-bootstrap = "scripts.bootstrap:main"' in content
     assert 'sdlc-hitl-run = "scripts.hitl_runner:main"' in content
-    assert 'langchain = "==0.3.20"' in content
-    assert 'langchain-ollama = "==0.2.3"' in content
-    assert 'langgraph = "==0.2.74"' in content
-    assert 'langsmith = "==0.2.19"' in content
-    assert 'autogen-agentchat = "==0.4.9"' not in content
+    assert 'langchain = "==1.2.13"' in content
+    assert 'langchain-ollama = "==1.0.1"' in content
+    assert 'langgraph = "==1.1.3"' in content
+    assert 'langsmith = "==0.7.22"' in content
+    assert 'autogen-agentchat = "==0.7.5"' not in content
 
 
 def test_tooling_example_toml_contains_stack_and_capabilities() -> None:
