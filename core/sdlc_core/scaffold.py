@@ -440,7 +440,7 @@ readme = "README.md"
 package-mode = false
 
 [tool.poetry.dependencies]
-python = "^3.11"
+python = "==3.13.9"
 {core_dep}{stack_deps}
 {script_block}
 
@@ -631,19 +631,19 @@ on:
 
 jobs:
   check:
-    runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+                    python-version: "3.13.9"
 
       - name: Install Poetry
-        run: pip install poetry
+                run: python -m pip install --upgrade pip poetry==2.3.3
 
       - name: Install dependencies
-                run: poetry install --no-root
+                run: poetry sync --no-root
 
       - name: Run integrity check
         run: |

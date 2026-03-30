@@ -7,7 +7,7 @@ readme = "README.md"
 packages = [{ include = "sdlc_core" }]
 
 [tool.poetry.dependencies]
-python = "^3.11"
+python = "==3.13.9"
 # ollama is optional: only needed when using OllamaProvider.
 # Install with: pip install ollama   or add it to your template's pyproject.toml.
 ollama = { version = ">=0.4", optional = true }

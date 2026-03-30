@@ -454,10 +454,13 @@ name = "sdlc-core"
 version = "0.1.0"
 description = "Shared runtime library for the AI-Augmented SDLC research experiment"
 optional = false
-python-versions = "^3.11"
+python-versions = "==3.13.9"
 groups = ["main"]
 files = []
 develop = true
+
+[package.extras]
+ollama = ["ollama (>=0.4)"]
 
 [package.source]
 type = "directory"
@@ -477,5 +480,5 @@ files = [
 
 [metadata]
 lock-version = "2.1"
-python-versions = "^3.11"
-content-hash = "744d8f506853b7b38c9895a37e5bd5fe9dd33bce984f3edce51c08adbd7c1265"
+python-versions = "==3.13.9"
+content-hash = "bffcb8f8f5e84375fd7bfbdb5f2dc65749c950eb957e1b6e437db209bc202217"
