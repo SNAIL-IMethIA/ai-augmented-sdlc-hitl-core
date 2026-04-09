@@ -180,6 +180,7 @@ def test_pyproject_toml_approach2_has_fixed_stack() -> None:
     assert 'sdlc-core = {git = "https://github.com/OWNER/repo.git"' in content
     assert 'rev = "sha", subdirectory = "core"}' in content
     assert 'sdlc-bootstrap = "scripts.bootstrap:main"' in content
+    assert 'sdlc-preflight = "scripts.preflight:main"' in content
     assert 'sdlc-pipeline = "scripts.pipeline_runner:main"' in content
     assert 'langchain = "==1.2.13"' in content
     assert 'langchain-ollama = "==1.0.1"' in content
@@ -193,6 +194,7 @@ def test_pyproject_toml_approach1_has_fixed_base_stack() -> None:
 
     content = _pyproject_toml(1, "sha", "https://github.com/OWNER/repo")
     assert 'sdlc-bootstrap = "scripts.bootstrap:main"' in content
+    assert 'sdlc-preflight = "scripts.preflight:main"' in content
     assert 'sdlc-hitl-run = "scripts.hitl_runner:main"' in content
     assert 'langchain = "==1.2.13"' in content
     assert 'langchain-ollama = "==1.0.1"' in content
@@ -297,8 +299,10 @@ def test_scaffold_approach1_creates_required_files(
     assert (output / "core_version.txt").exists()
     assert (output / ".github" / "copilot-instructions.md").exists()
     assert (output / ".github" / "workflows" / "ci.yml").exists()
+    assert (output / "OPERATOR_CHECKLIST.md").exists()
     assert (output / "scripts" / "__init__.py").exists()
     assert (output / "scripts" / "bootstrap.py").exists()
+    assert (output / "scripts" / "preflight.py").exists()
     assert (output / "scripts" / "hitl_runner.py").exists()
 
 
@@ -312,6 +316,9 @@ def test_scaffold_approach1_bootstrap_is_valid_python(
 
     source = (output / "scripts" / "bootstrap.py").read_text(encoding="utf-8")
     ast.parse(source)
+
+    preflight_source = (output / "scripts" / "preflight.py").read_text(encoding="utf-8")
+    ast.parse(preflight_source)
 
 
 def test_scaffold_approach1_creates_artifact_dirs(

@@ -414,10 +414,12 @@ def _pyproject_toml(
     script_block = (
         "\n[tool.poetry.scripts]\n"
         "sdlc-bootstrap = \"scripts.bootstrap:main\"\n"
+           "sdlc-preflight = \"scripts.preflight:main\"\n"
         "sdlc-hitl-run = \"scripts.hitl_runner:main\"\n"
         if approach == 1
         else "\n[tool.poetry.scripts]\n"
              "sdlc-bootstrap = \"scripts.bootstrap:main\"\n"
+               "sdlc-preflight = \"scripts.preflight:main\"\n"
              "sdlc-pipeline = \"scripts.pipeline_runner:main\"\n"
     )
 
@@ -506,6 +508,22 @@ poetry install
 poetry run sdlc-bootstrap --project <project_id>
 ```
 
+## Startup preflight (hard gate by default)
+
+Run this before starting phase work. By default it blocks start when required
+prechecks fail (missing config, missing run DB/schema, missing model mapping,
+or model connectivity failure).
+
+```bash
+poetry run sdlc-preflight --phase 2
+```
+
+Use advisory mode only when explicitly needed for diagnostics:
+
+```bash
+poetry run sdlc-preflight --phase 2 --advisory
+```
+
 ## Core Dependency Mode
 
 {core_mode_text}
@@ -533,6 +551,16 @@ Run your first phase command:
 
 ```bash
 {run_phase_snippet}
+```
+
+## Flexible work periods (pause and resume)
+
+Work can be split across multiple periods with breaks. Continuous 8-hour
+blocks are not required. Use pause/resume to keep a clean audit trail.
+
+```bash
+poetry run sdlc-pause --reason "end of work block"
+poetry run sdlc-resume --reason "start of next work block"
 ```
 
 ---
@@ -665,6 +693,181 @@ def _scripts_init() -> str:
 """
 
 
+def _operator_checklist() -> str:
+    return """\
+# Operator Checklist
+
+## 1. Start of work block
+
+1. Run hard-gate preflight:
+   - `poetry run sdlc-preflight --phase <2-8>`
+2. Confirm current run state:
+   - `poetry run sdlc-status --db logs/experiment.db`
+
+## 2. During work
+
+1. Execute planned phase/artifact command.
+2. Record outcomes and interventions.
+3. Accept artifacts only when criteria are met.
+4. Commit after accepted artifacts.
+
+## 3. End of work block
+
+1. Pause cleanly:
+   - `poetry run sdlc-pause --reason "end of work block"`
+2. Run integrity check if a phase boundary was reached:
+   - `poetry run python -m sdlc_core.check --db logs/experiment.db`
+3. Commit and push.
+
+## 4. Resume later
+
+1. Resume:
+   - `poetry run sdlc-resume --reason "resume work block"`
+2. Re-run preflight before continuing:
+   - `poetry run sdlc-preflight --phase <2-8>`
+"""
+
+
+def _preflight_py() -> str:
+    return """\
+from __future__ import annotations
+
+import argparse
+import sqlite3
+import tomllib
+from pathlib import Path
+from typing import Any
+
+from sdlc_core.providers.registry import get_provider
+
+
+def _startup_kwargs(entry: dict[str, Any]) -> dict[str, Any]:
+    kwargs: dict[str, Any] = {}
+    for key, value in entry.items():
+        if key.startswith("startup_check_") and key not in {"startup_check_prompt", "startup_check_system"}:
+            kwargs[key.removeprefix("startup_check_")] = value
+    return kwargs
+
+
+def _collect_issues(phase: int | None) -> list[str]:
+    issues: list[str] = []
+
+    run_cfg_path = Path("run_config.toml")
+    models_path = Path("models.toml")
+    db_path = Path("logs") / "experiment.db"
+
+    if not run_cfg_path.exists():
+        issues.append("Missing run_config.toml.")
+    if not models_path.exists():
+        issues.append("Missing models.toml.")
+    if issues:
+        return issues
+
+    try:
+        run_cfg = tomllib.loads(run_cfg_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        issues.append(f"Invalid run_config.toml: {type(exc).__name__}: {exc}")
+        return issues
+
+    try:
+        models_cfg = tomllib.loads(models_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        issues.append(f"Invalid models.toml: {type(exc).__name__}: {exc}")
+        return issues
+
+    phases_section = run_cfg.get("phases")
+    models_section = models_cfg.get("models")
+    if not isinstance(phases_section, dict):
+        issues.append("run_config.toml is missing [phases] section.")
+        return issues
+    if not isinstance(models_section, dict):
+        issues.append("models.toml is missing [models] section.")
+        return issues
+
+    check_phases = [phase] if phase is not None else list(range(2, 9))
+    selected_models: set[str] = set()
+    for p in check_phases:
+        key = f"phase{p}"
+        model_name = str(phases_section.get(key, "")).strip()
+        if not model_name:
+            issues.append(f"run_config.toml key '{key}' is empty.")
+            continue
+        if model_name not in models_section:
+            issues.append(f"Model '{model_name}' (from {key}) not found in models.toml.")
+            continue
+        selected_models.add(model_name)
+
+    if not db_path.exists():
+        issues.append("logs/experiment.db not found. Run poetry run sdlc-setup.")
+        return issues
+
+    try:
+        conn = sqlite3.connect(db_path)
+        try:
+            row = conn.execute("SELECT id FROM runs ORDER BY started_at DESC LIMIT 1").fetchone()
+            if row is None:
+                issues.append("No run found in logs/experiment.db. Run poetry run sdlc-setup.")
+        finally:
+            conn.close()
+    except sqlite3.OperationalError:
+        issues.append("Database schema missing. Run poetry run sdlc-setup.")
+    except Exception as exc:
+        issues.append(f"Failed to read logs/experiment.db: {type(exc).__name__}: {exc}")
+
+    for model_name in sorted(selected_models):
+        entry = models_section.get(model_name, {})
+        if not isinstance(entry, dict):
+            issues.append(f"Model '{model_name}' entry must be a table in models.toml.")
+            continue
+        prompt = str(entry.get("startup_check_prompt", "Respond with exactly: ok"))
+        system_raw = entry.get("startup_check_system", "")
+        system = str(system_raw).strip() or None
+        kwargs = _startup_kwargs(entry)
+        try:
+            provider = get_provider(model_name)
+            response = provider.complete(prompt, system=system, **kwargs)
+            if not str(response).strip():
+                raise ValueError("startup check returned an empty response")
+        except Exception as exc:
+            issues.append(f"Model '{model_name}' connectivity check failed: {type(exc).__name__}: {exc}")
+
+    return issues
+
+
+def run_preflight(*, phase: int | None, strict: bool = True, quiet: bool = False) -> int:
+    issues = _collect_issues(phase)
+    if not quiet:
+        if issues:
+            print("[preflight] FAILED")
+            for issue in issues:
+                print(f"  - {issue}")
+        else:
+            print("[preflight] OK")
+    return 1 if strict and issues else 0
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Run startup preflight checks. Hard gate by default."
+    )
+    parser.add_argument("--phase", type=int, choices=range(2, 9), default=None)
+    parser.add_argument(
+        "--advisory",
+        action="store_true",
+        help="Do not fail the command when issues are found.",
+    )
+    parser.add_argument("--quiet", action="store_true")
+    args = parser.parse_args()
+
+    strict = not args.advisory
+    raise SystemExit(run_preflight(phase=args.phase, strict=strict, quiet=args.quiet))
+
+
+if __name__ == "__main__":
+    main()
+"""
+
+
 def _bootstrap_py(approach: int) -> str:
     default_model = "llama3-local"
     return f"""\
@@ -744,6 +947,7 @@ from pathlib import Path
 from sdlc_core.providers import LoggedProvider
 from sdlc_core.providers.registry import get_provider
 from sdlc_core.session import Session
+from scripts.preflight import run_preflight
 
 
 def _resolve_run_id(db_path: Path, explicit: str | None) -> str:
@@ -786,6 +990,9 @@ def main() -> None:
     parser.add_argument("--prompt-file", default=None)
     args = parser.parse_args()
 
+    if run_preflight(phase=args.phase, strict=True, quiet=False) != 0:
+        raise SystemExit(1)
+
     db_path = Path("logs") / "experiment.db"
     run_id = _resolve_run_id(db_path, args.run_id)
     model_name = args.model or _model_for_phase(args.phase)
@@ -816,6 +1023,7 @@ from sdlc_core.enums import PipelineEventType
 from sdlc_core.providers import LoggedProvider
 from sdlc_core.providers.registry import get_provider
 from sdlc_core.session import Session
+from scripts.preflight import run_preflight
 
 
 def _resolve_run_id(db_path: Path, explicit: str | None) -> str:
@@ -862,6 +1070,9 @@ def main() -> None:
     parser.add_argument("--artifact-id", default=None)
     parser.add_argument("--agent-role", default="pipeline_orchestrator")
     args = parser.parse_args()
+
+    if run_preflight(phase=args.phase, strict=True, quiet=False) != 0:
+        raise SystemExit(1)
 
     db_path = Path("logs") / "experiment.db"
     run_id = _resolve_run_id(db_path, args.run_id)
@@ -966,8 +1177,10 @@ def _scaffold(
         _write(output / "LICENSE", license_text)
     _write(output / ".github" / "copilot-instructions.md", _copilot_instructions(approach))
     _write(output / ".github" / "workflows" / "ci.yml", _ci_workflow())
+    _write(output / "OPERATOR_CHECKLIST.md", _operator_checklist())
     _write(output / "scripts" / "__init__.py", _scripts_init())
     _write(output / "scripts" / "bootstrap.py", _bootstrap_py(approach))
+    _write(output / "scripts" / "preflight.py", _preflight_py())
 
     # Artifact phase directories
     for phase in range(2, 9):
