@@ -57,10 +57,10 @@ response = provider.complete(prompt="Draft the requirements document.")
 
 ## Installation in a template repo
 
-Add to `requirements.txt` (replace `{COMMIT_SHA}` with the pinned commit):
+Template repositories declare `sdlc-core` in `pyproject.toml` as a pinned Git dependency:
 
-```git
-sdlc-core @ git+https://github.com/SNAIL-IMethIA/ai-augmented-sdlc-hitl-core.git@{COMMIT_SHA}#subdirectory=core
+```toml
+sdlc-core = {git = "https://github.com/SNAIL-IMethIA/ai-augmented-sdlc-hitl-core.git", rev = "{COMMIT_SHA}", subdirectory = "core"}
 ```
 
 Also write the same SHA to `core_version.txt` in the template root and commit it before
@@ -71,13 +71,12 @@ the run begins. This file must not be modified during or after the run.
 ## Setup (run once per clone, before the run begins)
 
 ```bash
-pip install -r requirements.txt
-python setup.py
+poetry install
+poetry run sdlc-setup
 ```
 
-`setup.py` calls `sdlc_core.db.setup_db("logs/experiment.db")`, which creates the database
-with the full schema. The resulting empty `logs/experiment.db` must be committed before any
-experiment work begins.
+`sdlc-setup` validates the model configuration, validates model connectivity, and initializes
+the experiment database for the run.
 
 ---
 

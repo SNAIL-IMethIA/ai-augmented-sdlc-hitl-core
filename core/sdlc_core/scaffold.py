@@ -426,7 +426,12 @@ def _pyproject_toml(
     elif core_source == "local":
         if local_core_path is None:
             local_core_path = Path(__file__).resolve().parents[2] / "core"
-        core_dep = f'sdlc-core = {{path = "{local_core_path.resolve().as_posix()}", develop = true}}' # NOQA 501
+        resolved_path = local_core_path.resolve().as_posix()
+        core_dep = (
+            'sdlc-core = {path = "'
+            f"{resolved_path}"
+            '", develop = true}'
+        )
     else:
         raise ValueError(f"Unsupported core_source {core_source!r}; expected 'git' or 'local'.")
 

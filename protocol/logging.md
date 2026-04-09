@@ -31,7 +31,7 @@ The database is the ground truth for all metrics defined in [metrics.md](metrics
 
 ## Storage model
 
-Each template repository (one per approach × project run) holds its own `logs/experiment.db` file. The database is created before the run begins by running `python setup.py` in the template repo, which calls `sdlc_core.db.setup_db()` from the shared core library. The empty schema file is committed to version control at that point and constitutes the verifiable start state of the run.
+Each template repository (one per approach x project run) holds its own `logs/experiment.db` file. The database is created during setup by running `poetry run sdlc-setup` in the template repository. Setup uses the shared core library and prepares the database before phase execution begins.
 
 The database grows exclusively during the run. At run end, `python -m sdlc_core.metrics` is run to produce `logs/metrics_report.json`, which is also committed. Cross-run aggregation is performed separately in the core repository's `analysis/` folder after all runs are complete, by reading each repo's `metrics_report.json`.
 
@@ -63,7 +63,7 @@ One row per approach × project execution. A run spans Phases 2–8 or until the
 | --- | --- | --- |
 | `id` | text, primary key | Unique run identifier, e.g. `run-proj1-approach2-20250610` |
 | `project` | text | Project identifier, e.g. `project1` |
-| `approach` | integer | Approach number: 1, 2, 3, or 4 |
+| `approach` | integer | Approach number: 1 or 2 |
 | `started_at` | text | ISO 8601 timestamp when the run began |
 | `ended_at` | text | ISO 8601 timestamp when the run ended; null while in progress |
 | `terminal_phase` | integer | The last SDLC phase reached (2–8); null while in progress |
@@ -130,7 +130,7 @@ One row per prompt–response exchange, whether human-initiated or agent-to-agen
 | `artifact_id` | text | Artifact produced or updated; null for exploratory prompts before artifact creation |
 | `timestamp` | text | ISO 8601 |
 | `sdlc_phase` | integer | SDLC phase (2–8) |
-| `approach` | integer | Approach number (1–4) |
+| `approach` | integer | Approach number (1-2) |
 | `agent_role` | text | Declared role of the AI, e.g. `architect`, `reviewer` |
 | `model` | text | Model name and version |
 | `prompt` | text | Full prompt content, unredacted |

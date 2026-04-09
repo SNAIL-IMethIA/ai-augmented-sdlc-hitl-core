@@ -8,8 +8,8 @@ All contributions must pass `ruff` and `mypy` with zero errors before commit.
 
 | Tool | Version | Purpose |
 | ------ | --------- | --------- |
-| [Python](https://docs.python.org/3.11/) | 3.11+ | Runtime |
-| [Poetry](https://python-poetry.org/) | latest | Dependency and package management |
+| [Python](https://docs.python.org/3.13/) | 3.13.9 | Runtime |
+| [Poetry](https://python-poetry.org/) | 2.3.3 | Dependency and package management |
 | [ruff](https://docs.astral.sh/ruff/) | ^0.9 | Linting, import sorting, docstring checks |
 | [mypy](https://mypy.readthedocs.io/) | ^1.15 | Static type checking (strict mode) |
 | [pytest](https://docs.pytest.org/) | ^8.0 | Test runner |
@@ -19,7 +19,7 @@ All contributions must pass `ruff` and `mypy` with zero errors before commit.
 
 ## Development setup
 
-Requires Python 3.11+ and [Poetry](https://python-poetry.org/).
+Requires Python 3.13.9 and [Poetry](https://python-poetry.org/).
 
 ```bash
 # Clone and install everything. One venv at repo root covers all packages.

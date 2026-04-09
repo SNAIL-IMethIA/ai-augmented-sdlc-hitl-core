@@ -1,6 +1,6 @@
 # AI-Augmented SDLC HITL Core
 
-An IEEE 12207–Aligned Workflow for AI-Augmented Software Development: From Human-Orchestrated to Agent-Based Automation.
+An IEEE 12207-aligned workflow for AI-augmented software development from human-orchestrated to agent-based automation.
 
 ![Status](https://img.shields.io/badge/status-experimental-yellow) ![License](https://img.shields.io/badge/license-MIT-blue)
 
@@ -183,18 +183,18 @@ The SHA is also written to `core_version.txt` in the template repository and com
 
 ### Templates (Scaffolding)
 
-- [Approach 1: Human orchestrator with multiple role-playing agents](https://github.com/SNAIL-IMethIA/template-approach2-human-orchestrator)  
-- [Approach 2: Master agent / AI workflow coordinating multiple agents](https://github.com/SNAIL-IMethIA/template-approach4-ai-workflow)  
+- [Approach 1: Human orchestrator with multiple role-playing agents](https://github.com/SNAIL-IMethIA/template-approach1-human-orchestrator)  
+- [Approach 2: Master agent or AI workflow coordinating multiple agents](https://github.com/SNAIL-IMethIA/template-approach2-ai-workflow)  
 
 ### Project 1: No-code finance strategy builder
 
-- [Approach 1: Human orchestrator with multiple role-playing agents](https://github.com/SNAIL-IMethIA/project1-approach2-human-orchestrator)  
-- [Approach 2: Master agent / AI workflow coordinating multiple agents](https://github.com/SNAIL-IMethIA/project1-approach4-ai-workflow)  
+- [Approach 1: Human orchestrator with multiple role-playing agents](https://github.com/SNAIL-IMethIA/project1-approach1-human-orchestrator)  
+- [Approach 2: Master agent or AI workflow coordinating multiple agents](https://github.com/SNAIL-IMethIA/project1-approach2-ai-workflow)  
 
 ### Project 2: Hotel (resort) reservation website
 
-- [Approach 1: Human orchestrator with multiple role-playing agents](https://github.com/SNAIL-IMethIA/project2-approach2-human-orchestrator)  
-- [Approach 2: Master agent / AI workflow coordinating multiple agents](https://github.com/SNAIL-IMethIA/project2-approach4-ai-workflow)  
+- [Approach 1: Human orchestrator with multiple role-playing agents](https://github.com/SNAIL-IMethIA/project2-approach1-human-orchestrator)  
+- [Approach 2: Master agent or AI workflow coordinating multiple agents](https://github.com/SNAIL-IMethIA/project2-approach2-ai-workflow)  
 
 ---
 
