@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import json
 import re
 from collections.abc import Generator
@@ -299,6 +300,18 @@ def test_scaffold_approach1_creates_required_files(
     assert (output / "scripts" / "__init__.py").exists()
     assert (output / "scripts" / "bootstrap.py").exists()
     assert (output / "scripts" / "hitl_runner.py").exists()
+
+
+def test_scaffold_approach1_bootstrap_is_valid_python(
+    tmp_path: Path, _mock_git: None
+) -> None:
+    from sdlc_core.scaffold import _scaffold
+
+    output = tmp_path / "a1"
+    _scaffold(1, output)
+
+    source = (output / "scripts" / "bootstrap.py").read_text(encoding="utf-8")
+    ast.parse(source)
 
 
 def test_scaffold_approach1_creates_artifact_dirs(

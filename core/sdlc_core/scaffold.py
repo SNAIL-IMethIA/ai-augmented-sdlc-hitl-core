@@ -682,19 +682,19 @@ def _copy_if_missing(src: Path, dst: Path) -> None:
 
 def _write_run_config(project: str, model: str) -> None:
     content = (
-        "# run_config.toml\n"
-        "[run]\n"
-        'project    = "' + project + '"\n'
-        f'approach   = "A{approach}"\n'
-        "\n"
-        "[phases]\n"
-        'phase2 = "' + model + '"\n'
-        'phase3 = "' + model + '"\n'
-        'phase4 = "' + model + '"\n'
-        'phase5 = "' + model + '"\n'
-        'phase6 = "' + model + '"\n'
-        'phase7 = "' + model + '"\n'
-        'phase8 = "' + model + '"\n'
+        "# run_config.toml\\n"
+        "[run]\\n"
+        'project    = "' + project + '"\\n'
+        f'approach   = "A{approach}"\\n'
+        "\\n"
+        "[phases]\\n"
+        'phase2 = "' + model + '"\\n'
+        'phase3 = "' + model + '"\\n'
+        'phase4 = "' + model + '"\\n'
+        'phase5 = "' + model + '"\\n'
+        'phase6 = "' + model + '"\\n'
+        'phase7 = "' + model + '"\\n'
+        'phase8 = "' + model + '"\\n'
     )
     Path("run_config.toml").write_text(content, encoding="utf-8")
 
