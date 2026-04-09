@@ -259,7 +259,7 @@ def test_ci_workflow_contains_check_step() -> None:
 
 
 @pytest.fixture()
-def _mock_git() -> Generator[None, None, None]:
+def _mock_git() -> Generator[None]:
     """Patch git calls used by _scaffold."""
     with (
         patch("sdlc_core.scaffold._get_core_sha", return_value="deadbeef"),

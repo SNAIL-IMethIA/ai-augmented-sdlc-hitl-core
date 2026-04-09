@@ -48,7 +48,7 @@ def _default_db_path() -> Path:
 
 
 @contextmanager
-def _connect(db_path: Path | None = None) -> Generator[sqlite3.Connection, None, None]:
+def _connect(db_path: Path | None = None) -> Generator[sqlite3.Connection]:
     path = db_path or _default_db_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(path)

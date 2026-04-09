@@ -48,7 +48,7 @@ from sdlc_core.enums import (
 
 
 @contextmanager
-def _conn(db_path: Path) -> Generator[sqlite3.Connection, None, None]:
+def _conn(db_path: Path) -> Generator[sqlite3.Connection]:
     conn = sqlite3.connect(db_path)
     conn.execute("PRAGMA foreign_keys = ON")
     conn.row_factory = sqlite3.Row
