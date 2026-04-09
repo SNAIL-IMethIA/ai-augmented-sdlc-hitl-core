@@ -117,3 +117,13 @@ def test_status_snapshot_json_serializable(tmp_path: Path) -> None:
     payload = _status_snapshot(db_path)
     encoded = json.dumps(payload)
     assert "No runs found" in encoded
+
+
+def test_status_snapshot_handles_missing_schema(tmp_path: Path) -> None:
+    db_path = tmp_path / "empty.db"
+    db_path.touch()
+
+    payload = _status_snapshot(db_path)
+
+    assert payload["has_run"] is False
+    assert "Run poetry run sdlc-setup first" in payload["message"]

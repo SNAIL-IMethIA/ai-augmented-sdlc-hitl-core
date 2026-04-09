@@ -111,7 +111,16 @@ def _status_snapshot(db_path: Path) -> dict[str, Any]:
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     try:
-        run = _fetch_latest_run(conn)
+        try:
+            run = _fetch_latest_run(conn)
+        except sqlite3.OperationalError:
+            return {
+                "database": db_path.as_posix(),
+                "has_run": False,
+                "message": (
+                    "Database schema is missing. Run poetry run sdlc-setup first."
+                ),
+            }
         if run is None:
             return {
                 "database": db_path.as_posix(),
