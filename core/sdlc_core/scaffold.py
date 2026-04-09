@@ -640,17 +640,17 @@ jobs:
             - uses: actions/checkout@v4
 
             - uses: actions/setup-python@v5
-                with:
+              with:
                     python-version: "3.13.9"
 
             - name: Install Poetry
-                run: python -m pip install --upgrade pip poetry==2.3.3
+              run: python -m pip install --upgrade pip poetry==2.3.3
 
             - name: Install dependencies
-                run: poetry sync --no-root
+              run: poetry sync --no-root
 
             - name: Run integrity check
-                run: |
+              run: |
                     if [ -f logs/experiment.db ]; then
                         poetry run python -m sdlc_core.check logs/experiment.db
                     else

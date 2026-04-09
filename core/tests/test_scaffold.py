@@ -255,6 +255,8 @@ def test_ci_workflow_contains_check_step() -> None:
     assert re.search(r"jobs:\n\s+check:\n\s+runs-on: ubuntu-24.04", content)
     assert re.search(r"with:\n\s+python-version: \"3.13.9\"", content)
     assert re.search(r"- name: Install dependencies\n\s+run: poetry sync --no-root", content)
+    assert "- uses: actions/setup-python@v5\n              with:" in content
+    assert "- name: Install Poetry\n              run:" in content
 
 
 # ---------------------------------------------------------------------------
