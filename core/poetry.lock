@@ -28,7 +28,6 @@ files = [
 
 [package.dependencies]
 idna = ">=2.8"
-typing_extensions = {version = ">=4.5", markers = "python_version < \"3.13\""}
 
 [package.extras]
 trio = ["trio (>=0.31.0) ; python_version < \"3.10\"", "trio (>=0.32.0) ; python_version >= \"3.10\""]
@@ -333,5 +332,5 @@ ollama = ["ollama"]
 
 [metadata]
 lock-version = "2.1"
-python-versions = "^3.11"
-content-hash = "ec0ea4338527ef1c22ac89432037e7eddbe6d7f64bc68b2275b5245e59817e39"
+python-versions = "==3.13.9"
+content-hash = "c9422edcad758e9711755d734912f0a64c0b3156a5df672a8f9a701f027214d3"
