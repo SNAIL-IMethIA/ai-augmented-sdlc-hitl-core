@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Generator
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -251,6 +252,9 @@ def test_ci_workflow_contains_check_step() -> None:
     content = _ci_workflow()
     assert "experiment.db" in content
     assert "sdlc_core.check" in content
+    assert re.search(r"jobs:\n\s+check:\n\s+runs-on: ubuntu-24.04", content)
+    assert re.search(r"with:\n\s+python-version: \"3.13.9\"", content)
+    assert re.search(r"- name: Install dependencies\n\s+run: poetry sync --no-root", content)
 
 
 # ---------------------------------------------------------------------------

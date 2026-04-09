@@ -18,6 +18,7 @@ The experiment compares two deliberately different execution modes for the same 
 This framing isolates the core research axis of interest: **human-in-the-loop orchestration versus autonomous pipeline operation** under identical SDLC artifacts, checks, and metrics.
 
 > Interaction standards (prompt template, per-phase contract, AI-AI rules) are defined in [interactions.md](interactions.md). Metrics are defined in [metrics.md](metrics.md). Data schemas are in [logging.md](logging.md).
+> Daily execution flow and checkpoint operations are defined in [runbook.md](runbook.md).
 
 ---
 

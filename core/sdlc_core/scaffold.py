@@ -485,7 +485,6 @@ def _readme(
             "**Local path (machine-specific)**. This template points `sdlc-core` to "
             f"`{local_core_path.resolve().as_posix()}` for rapid local iteration."
         )
-
     return f"""\
 # {repo_slug}
 
@@ -626,37 +625,37 @@ https://github.com/SNAIL-IMethIA/ai-augmented-sdlc-hitl-core
 
 
 def _ci_workflow() -> str:
-    return """\
+        return """\
 name: CI
 
 on:
-  push:
-    branches: ["main"]
-  pull_request:
+    push:
+        branches: ["main"]
+    pull_request:
 
 jobs:
-  check:
+    check:
         runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
+        steps:
+            - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
-        with:
+            - uses: actions/setup-python@v5
+                with:
                     python-version: "3.13.9"
 
-      - name: Install Poetry
+            - name: Install Poetry
                 run: python -m pip install --upgrade pip poetry==2.3.3
 
-      - name: Install dependencies
+            - name: Install dependencies
                 run: poetry sync --no-root
 
-      - name: Run integrity check
-        run: |
-          if [ -f logs/experiment.db ]; then
-            poetry run python -m sdlc_core.check logs/experiment.db
-          else
-            echo "No experiment.db found. Skipping check."
-          fi
+            - name: Run integrity check
+                run: |
+                    if [ -f logs/experiment.db ]; then
+                        poetry run python -m sdlc_core.check logs/experiment.db
+                    else
+                        echo "No experiment.db found. Skipping check."
+                    fi
 """
 
 

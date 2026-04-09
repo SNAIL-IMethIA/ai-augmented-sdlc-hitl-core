@@ -129,6 +129,23 @@ also written to `logs/check_report.json`.
 
 ---
 
+## Operator CLI helpers
+
+```bash
+poetry run sdlc-status --db logs/experiment.db
+```
+
+Shows active phase, pending checkpoints, last accepted artifact, and open violations.
+
+```bash
+poetry run sdlc-diff-summary --since <commit_sha> --repo . --db logs/experiment.db
+```
+
+Summarizes changed files since a commit and classifies artifact changes as AI-originated or
+human-modified when data is available.
+
+---
+
 ## Metrics report (run at run end)
 
 ```bash

@@ -22,6 +22,7 @@ The repository centralizes experiment rules and documentation, while templates a
 6. [Core Library](#6-core-library)
 7. [Repositories Overview](#7-repositories-overview)
 8. [Metrics & Analysis](#8-metrics--analysis)
+9. [Operator Runbook](#9-operator-runbook)
 
 ---
 
@@ -201,5 +202,11 @@ The SHA is also written to `core_version.txt` in the template repository and com
 ## 8. Metrics & Analysis
 
 All experiments handle their own metrics extraction in their corresponding repository according to the protocol defined in [`protocol/metrics.md`](protocol/metrics.md). Aggregation and cross-approach analysis are performed after all runs are complete.
+
+---
+
+## 9. Operator Runbook
+
+Use the canonical operator flow in [`protocol/runbook.md`](protocol/runbook.md) before starting timed runs.
 
 ---

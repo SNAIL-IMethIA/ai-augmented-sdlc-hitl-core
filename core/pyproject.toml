@@ -22,6 +22,8 @@ sdlc-scaffold     = "sdlc_core.scaffold:main"
 sdlc-pause        = "sdlc_core.run_control:pause_main"
 sdlc-resume       = "sdlc_core.run_control:resume_main"
 sdlc-abandon-run  = "sdlc_core.run_control:abandon_main"
+sdlc-status       = "sdlc_core.status:main"
+sdlc-diff-summary = "sdlc_core.diff_summary:main"
 
 [build-system]
 requires = ["poetry-core"]
