@@ -559,8 +559,8 @@ Work can be split across multiple periods with breaks. Continuous 8-hour
 blocks are not required. Use pause/resume to keep a clean audit trail.
 
 ```bash
-poetry run sdlc-pause --reason "end of work block"
-poetry run sdlc-resume --reason "start of next work block"
+poetry run sdlc-pause
+poetry run sdlc-resume
 ```
 
 ---
@@ -714,7 +714,7 @@ def _operator_checklist() -> str:
 ## 3. End of work block
 
 1. Pause cleanly:
-   - `poetry run sdlc-pause --reason "end of work block"`
+    - `poetry run sdlc-pause`
 2. Run integrity check if a phase boundary was reached:
    - `poetry run python -m sdlc_core.check --db logs/experiment.db`
 3. Commit and push.
@@ -722,7 +722,7 @@ def _operator_checklist() -> str:
 ## 4. Resume later
 
 1. Resume:
-   - `poetry run sdlc-resume --reason "resume work block"`
+    - `poetry run sdlc-resume`
 2. Re-run preflight before continuing:
    - `poetry run sdlc-preflight --phase <2-8>`
 """
@@ -736,17 +736,8 @@ import argparse
 import sqlite3
 import tomllib
 from pathlib import Path
-from typing import Any
 
-from sdlc_core.providers.registry import get_provider
-
-
-def _startup_kwargs(entry: dict[str, Any]) -> dict[str, Any]:
-    kwargs: dict[str, Any] = {}
-    for key, value in entry.items():
-        if key.startswith("startup_check_") and key not in {"startup_check_prompt", "startup_check_system"}:
-            kwargs[key.removeprefix("startup_check_")] = value
-    return kwargs
+from sdlc_core.setup_run import collect_startup_model_issues
 
 
 def _collect_issues(phase: int | None) -> list[str]:
@@ -814,22 +805,12 @@ def _collect_issues(phase: int | None) -> list[str]:
     except Exception as exc:
         issues.append(f"Failed to read logs/experiment.db: {type(exc).__name__}: {exc}")
 
-    for model_name in sorted(selected_models):
-        entry = models_section.get(model_name, {})
-        if not isinstance(entry, dict):
-            issues.append(f"Model '{model_name}' entry must be a table in models.toml.")
-            continue
-        prompt = str(entry.get("startup_check_prompt", "Respond with exactly: ok"))
-        system_raw = entry.get("startup_check_system", "")
-        system = str(system_raw).strip() or None
-        kwargs = _startup_kwargs(entry)
-        try:
-            provider = get_provider(model_name)
-            response = provider.complete(prompt, system=system, **kwargs)
-            if not str(response).strip():
-                raise ValueError("startup check returned an empty response")
-        except Exception as exc:
-            issues.append(f"Model '{model_name}' connectivity check failed: {type(exc).__name__}: {exc}")
+    if phase is not None and phase not in range(2, 9):
+        issues.append(f"Invalid phase {phase}; expected one of 2..8.")
+        return issues
+
+    if selected_models:
+        issues.extend(collect_startup_model_issues(run_cfg, models_cfg, phase=phase))
 
     return issues
 

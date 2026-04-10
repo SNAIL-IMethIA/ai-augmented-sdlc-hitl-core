@@ -82,12 +82,30 @@ def _validate_models(run_cfg: dict[str, Any], models_data: dict[str, Any]) -> di
 
     Returns a mapping of phase_number -> model_name.
     """
+    phase_map, errors = _collect_model_validation_errors(run_cfg, models_data, phases=_PHASES)
+
+    if errors:
+        _die(
+            "Validation failed. Fix the following before running sdlc-setup:\n"
+            + "\n".join(errors)
+        )
+
+    return phase_map
+
+
+def _collect_model_validation_errors(
+    run_cfg: dict[str, Any],
+    models_data: dict[str, Any],
+    *,
+    phases: tuple[int, ...],
+) -> tuple[dict[int, str], list[str]]:
+    """Return phase->model map plus validation errors for selected phases."""
     phases_section: dict[str, Any] = run_cfg.get("phases", {})
     models_section: dict[str, Any] = models_data.get("models", {})
     phase_map: dict[int, str] = {}
     errors: list[str] = []
 
-    for phase in _PHASES:
+    for phase in phases:
         key = f"phase{phase}"
         model_name: str = phases_section.get(key, "").strip()
         if not model_name:
@@ -120,13 +138,7 @@ def _validate_models(run_cfg: dict[str, Any], models_data: dict[str, Any]) -> di
             )
         phase_map[phase] = model_name
 
-    if errors:
-        _die(
-            "Validation failed. Fix the following before running sdlc-setup:\n"
-            + "\n".join(errors)
-        )
-
-    return phase_map
+    return phase_map, errors
 
 
 def _startup_check_kwargs(model_entry: dict[str, Any]) -> dict[str, Any]:
@@ -153,6 +165,21 @@ def _validate_model_connectivity(
     # Keep deterministic order and test each configured model once.
     used_models = list(dict.fromkeys(phase_map[phase] for phase in sorted(phase_map)))
 
+    errors = _collect_model_connectivity_errors(used_models, models_section)
+
+    if errors:
+        _die(
+            "Startup model connectivity checks failed. "
+            "Fix model/provider configuration before running sdlc-setup:\n"
+            + "\n".join(errors)
+        )
+
+
+def _collect_model_connectivity_errors(
+    used_models: list[str],
+    models_section: dict[str, Any],
+) -> list[str]:
+    """Return connectivity check errors for selected model names."""
     errors: list[str] = []
     for model_name in used_models:
         entry = models_section.get(model_name, {})
@@ -168,13 +195,32 @@ def _validate_model_connectivity(
                 raise ValueError("startup check returned an empty response")
         except Exception as exc:
             errors.append(f"  - Model {model_name!r}: {type(exc).__name__}: {exc}")
+    return errors
 
-    if errors:
-        _die(
-            "Startup model connectivity checks failed. "
-            "Fix model/provider configuration before running sdlc-setup:\n"
-            + "\n".join(errors)
-        )
+
+def collect_startup_model_issues(
+    run_data: dict[str, Any],
+    models_data: dict[str, Any],
+    *,
+    phase: int | None = None,
+) -> list[str]:
+    """Collect startup model validation/connectivity issues without exiting.
+
+    This helper is used by scaffolded preflight scripts to enforce the same
+    model checks as ``sdlc-setup`` while avoiding duplicated logic.
+    """
+    phases = (phase,) if phase is not None else _PHASES
+    phase_map, validation_errors = _collect_model_validation_errors(
+        run_data,
+        models_data,
+        phases=phases,
+    )
+    if validation_errors:
+        return validation_errors
+
+    models_section: dict[str, Any] = models_data.get("models", {})
+    used_models = list(dict.fromkeys(phase_map[p] for p in sorted(phase_map)))
+    return _collect_model_connectivity_errors(used_models, models_section)
 
 
 # ---------------------------------------------------------------------------
