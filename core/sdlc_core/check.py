@@ -24,6 +24,7 @@ General (all approaches):
   G5  No session row has ended_at IS NULL at run close (runs.ended_at IS NOT NULL).
   G6  Artifact ids are unique within a run (enforced by PK, but we double-check).
   G7  All integer PKs in every table are monotonically increasing (tamper check).
+    G8  Each (run_id, phase) uses at most one distinct model in interactions.
 
 Phase exit criteria (from sdlc.md):
   P1  Phase 1 baseline seeded (pre-experiment): at least one phase-1 artifact is
@@ -276,6 +277,43 @@ def g7_monotonic_pks(conn: sqlite3.Connection) -> CheckResult:
                   f"Non-monotonic sequences: {'; '.join(failures)}")
 
 
+def g8_single_model_per_run_phase(conn: sqlite3.Connection) -> CheckResult:
+    """Each run/phase pair uses no more than one distinct model."""
+    rows = conn.execute(
+        """
+        SELECT run_id, sdlc_phase, COUNT(DISTINCT model) AS model_count
+        FROM interactions
+        GROUP BY run_id, sdlc_phase
+        HAVING model_count > 1
+        """
+    ).fetchall()
+    if not rows:
+        return _check("G8", "Each run/phase uses one model version", True)
+
+    detail_parts: list[str] = []
+    for row in rows:
+        models = conn.execute(
+            """
+            SELECT DISTINCT model
+            FROM interactions
+            WHERE run_id = ? AND sdlc_phase = ?
+            ORDER BY model
+            """,
+            (row["run_id"], row["sdlc_phase"]),
+        ).fetchall()
+        model_list = ", ".join(str(m[0]) for m in models)
+        detail_parts.append(
+            f"{row['run_id']} phase {row['sdlc_phase']} models=[{model_list}]"
+        )
+
+    return _check(
+        "G8",
+        "Each run/phase uses one model version",
+        False,
+        "Protocol deviation: multiple models detected in phase: " + "; ".join(detail_parts),
+    )
+
+
 def _phase_artifact_check(
     conn: sqlite3.Connection,
     check_id: str,
@@ -288,8 +326,19 @@ def _phase_artifact_check(
         (phase,),
     ).fetchone()[0]
     if completed == 0:
-        # Phase not yet completed in any run
-        # Skip this check
+        produced = conn.execute(
+            "SELECT COUNT(*) FROM artifacts WHERE phase = ?",
+            (phase,),
+        ).fetchone()[0]
+        if produced > 0:
+            return _check(
+                check_id,
+                desc,
+                False,
+                "Artifacts exist for this phase but phase status is not 'completed'. "
+                "Record completion with sdlc-phase-status.",
+            )
+        # Phase not yet completed and no artifacts were produced yet.
         return _check(check_id, desc, True, "Phase not yet completed; check skipped")
 
     rows = conn.execute(
@@ -322,6 +371,18 @@ def _phase_validation_check(
         (phase,),
     ).fetchone()[0]
     if completed == 0:
+        existing = conn.execute(
+            "SELECT COUNT(*) FROM validation_results WHERE sdlc_phase = ?",
+            (phase,),
+        ).fetchone()[0]
+        if existing > 0:
+            return _check(
+                check_id,
+                desc,
+                False,
+                "Validation rows exist for this phase but phase status is not 'completed'. "
+                "Record completion with sdlc-phase-status.",
+            )
         return _check(check_id, desc, True, "Phase not yet completed; check skipped")
 
     count = conn.execute(
@@ -346,6 +407,25 @@ def p8_transition_evidence(conn: sqlite3.Connection) -> CheckResult:
         "SELECT COUNT(*) FROM phase_progress WHERE phase_number = 8 AND status = 'completed'"
     ).fetchone()[0]
     if completed == 0:
+        trans_any = conn.execute(
+            "SELECT COUNT(*) FROM artifacts WHERE phase = 8 AND id LIKE 'TRANS-%'"
+        ).fetchone()[0]
+        acceptance_any = conn.execute(
+            """
+            SELECT COUNT(*)
+            FROM validation_results
+            WHERE sdlc_phase = 8
+              AND validation_type = 'acceptance_test'
+            """
+        ).fetchone()[0]
+        if trans_any > 0 or acceptance_any > 0:
+            return _check(
+                "P8",
+                desc,
+                False,
+                "Phase-8 evidence exists but phase status is not 'completed'. "
+                "Record completion with sdlc-phase-status.",
+            )
         return _check("P8", desc, True, "Phase not yet completed; check skipped")
 
     trans_count = conn.execute(
@@ -408,6 +488,7 @@ def run_all_checks(db_path: Path) -> list[CheckResult]:
         results.append(g5_all_sessions_closed(conn))
         results.append(g6_unique_artifact_ids_per_run(conn))
         results.append(g7_monotonic_pks(conn))
+        results.append(g8_single_model_per_run_phase(conn))
         results.append(p1_seed_artifacts_registered(conn))
         results.append(_phase_artifact_check(conn, "P2", 2, "Requirements"))
         results.append(_phase_artifact_check(conn, "P3", 3, "Architecture"))

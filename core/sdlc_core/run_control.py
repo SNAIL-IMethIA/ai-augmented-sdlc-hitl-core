@@ -98,10 +98,15 @@ def _log_note(run_id: str, note: str, db_path: Path) -> None:
 
 
 def pause_main() -> None:
-    """Pause a run safely by closing open sessions and writing an audit note."""
+    """Pause a run safely and optionally close active sessions."""
     parser = argparse.ArgumentParser(prog="sdlc-pause", description="Pause an active run.")
     parser.add_argument("--run-id", default=None, help="Run ID. Defaults to latest open run.")
     parser.add_argument("--reason", default="manual pause", help="Reason recorded in logs.")
+    parser.add_argument(
+        "--close-session",
+        action="store_true",
+        help="Close currently open session(s) when pausing.",
+    )
     parser.add_argument("--db", default=None, help="Path to experiment.db.")
     args = parser.parse_args()
 
@@ -113,11 +118,17 @@ def pause_main() -> None:
     finally:
         conn.close()
 
-    for session_number in open_sessions:
-        db.close_session(run_id=run_id, session_number=session_number, db_path=path)
+    closed_sessions: list[int] = []
+    if args.close_session:
+        for session_number in open_sessions:
+            db.close_session(run_id=run_id, session_number=session_number, db_path=path)
+            closed_sessions.append(session_number)
 
     _log_note(run_id, f"Run paused: {args.reason}", path)
-    print(f"[run-control] Paused run {run_id!r}. Closed sessions: {open_sessions}")
+    print(
+        f"[run-control] Paused run {run_id!r}. "
+        f"Closed sessions: {closed_sessions}."
+    )
 
 
 def resume_main() -> None:
@@ -140,7 +151,12 @@ def resume_main() -> None:
         run_id = _resolve_run_id(conn, args.run_id, require_open=True)
         open_sessions = _open_session_numbers(conn, run_id)
         if open_sessions:
-            _die(f"Run {run_id!r} already has an open session: {open_sessions}")
+            _log_note(run_id, f"Run resumed: {args.reason}", path)
+            print(
+                f"[run-control] Resumed run {run_id!r}. "
+                f"Session already open: {open_sessions}."
+            )
+            return
         session_number = args.session_number or _next_session_number(conn, run_id)
     finally:
         conn.close()

@@ -18,12 +18,14 @@ will reuse the existing run record if the run ID is already present.
 from __future__ import annotations
 
 import os
+import sqlite3
 import sys
 import tomllib
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from sdlc_core.db import open_run, setup_db
+from sdlc_core.db import open_run, seed_model_assignments, setup_db
 from sdlc_core.providers.registry import get_provider
 
 # ---------------------------------------------------------------------------
@@ -267,6 +269,50 @@ def _resolve_sha() -> str:
         return "unknown"
 
 
+def _deterministic_run_id(project: str, approach: int) -> str:
+    """Return the deterministic run ID shape used by open_run defaults."""
+    day = datetime.now(UTC).date().isoformat().replace("-", "")
+    return f"run-{project}-approach{approach}-{day}"
+
+
+def _open_or_reuse_run(project: str, approach: int, db_path: Path) -> tuple[str, bool]:
+    """Open a run or reuse the existing deterministic run for today.
+
+    Returns:
+        (run_id, reused_existing)
+
+    """
+    run_id = _deterministic_run_id(project, approach)
+
+    try:
+        inserted_run_id = open_run(
+            project=project,
+            approach=approach,
+            run_id=run_id,
+            db_path=db_path,
+        )
+        return inserted_run_id, False
+    except sqlite3.IntegrityError:
+        conn = sqlite3.connect(db_path)
+        try:
+            row = conn.execute(
+                "SELECT id, project, approach FROM runs WHERE id = ?",
+                (run_id,),
+            ).fetchone()
+        finally:
+            conn.close()
+
+        if row is None:
+            raise
+
+        if str(row[1]) != project or int(row[2]) != approach:
+            _die(
+                "Run ID collision detected with mismatched project/approach. "
+                "Inspect logs/experiment.db before continuing."
+            )
+        return run_id, True
+
+
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
@@ -296,7 +342,8 @@ def main() -> None:
     )
 
     db_path = setup_db()
-    run_id = open_run(project=project, approach=approach)
+    run_id, reused_existing = _open_or_reuse_run(project, approach, db_path)
+    seed_model_assignments(run_id=run_id, phase_map=phase_map, overwrite=False, db_path=db_path)
 
     # Print confirmation
     width = 60
@@ -305,6 +352,7 @@ def main() -> None:
     print("  sdlc-setup complete")
     print("=" * width)
     print(f"  Run ID    : {run_id}")
+    print(f"  Run state : {'reused existing record' if reused_existing else 'opened new record'}")
     print(f"  Project   : {project}")
     print(f"  Approach  : A{approach}")
     print(f"  Core SHA  : {sha[:12]}...")

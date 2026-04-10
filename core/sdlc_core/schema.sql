@@ -21,8 +21,9 @@ CREATE TABLE IF NOT EXISTS runs (
 
 -- ---------------------------------------------------------------------------
 -- sessions
--- One row per working session (day) within a run.
--- A completed run has exactly 3 session rows.
+-- One row per planned working session within a run.
+-- A run may be paused/resumed multiple times while a session remains open.
+-- Session numbers remain bounded to 1..3 for the 3-block experiment plan.
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS sessions (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -45,6 +46,20 @@ CREATE TABLE IF NOT EXISTS phase_progress (
                     )),
     entered_at      TEXT,                  -- ISO 8601. NULL if not yet started.
     completed_at    TEXT,                  -- ISO 8601. NULL if not yet complete.
+    PRIMARY KEY (run_id, phase_number)
+);
+
+-- ---------------------------------------------------------------------------
+-- model_assignments
+-- Effective model mapping per run and phase.
+-- Seeded at setup from run_config.toml and updated by sdlc-assign-model.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS model_assignments (
+    run_id          TEXT    NOT NULL REFERENCES runs (id),
+    phase_number    INTEGER NOT NULL CHECK (phase_number BETWEEN 2 AND 8),
+    model           TEXT    NOT NULL,
+    source          TEXT    NOT NULL CHECK (source IN ('setup', 'reassignment')),
+    assigned_at     TEXT    NOT NULL,      -- ISO 8601
     PRIMARY KEY (run_id, phase_number)
 );
 

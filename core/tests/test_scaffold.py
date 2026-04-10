@@ -320,6 +320,9 @@ def test_scaffold_approach1_bootstrap_is_valid_python(
     preflight_source = (output / "scripts" / "preflight.py").read_text(encoding="utf-8")
     ast.parse(preflight_source)
 
+    hitl_source = (output / "scripts" / "hitl_runner.py").read_text(encoding="utf-8")
+    ast.parse(hitl_source)
+
 
 def test_scaffold_approach1_creates_artifact_dirs(
     tmp_path: Path, _mock_git: None
@@ -366,6 +369,9 @@ def test_scaffold_approach2_creates_pipeline_contract(
     assert "runtime_policy" in data
     assert "2" in data["phases"]
     assert "8" in data["phases"]
+
+    runner_source = runner_path.read_text(encoding="utf-8")
+    ast.parse(runner_source)
 
 
 def test_scaffold_approach1_no_pipeline_contract(

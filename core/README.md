@@ -144,6 +144,21 @@ poetry run sdlc-diff-summary --since <commit_sha> --repo . --db logs/experiment.
 Summarizes changed files since a commit and classifies artifact changes as AI-originated or
 human-modified when data is available.
 
+```bash
+poetry run sdlc-phase-status --phase <2-8> --status in_progress|completed --db logs/experiment.db
+```
+
+Records phase progress transitions for integrity checks and status snapshots.
+
+```bash
+poetry run sdlc-pause --db logs/experiment.db
+poetry run sdlc-pause --close-session --db logs/experiment.db
+poetry run sdlc-resume --db logs/experiment.db
+```
+
+Pause/resume supports short interruptions without consuming a new session number.
+Use `--close-session` at day/work-block boundaries.
+
 ---
 
 ## Metrics report (run at run end)

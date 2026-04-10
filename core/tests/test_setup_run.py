@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sqlite3
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -404,6 +405,7 @@ def test_main_success_prints_run_id(
     with (
         patch("sdlc_core.setup_run.setup_db", return_value=fake_db),
         patch("sdlc_core.setup_run.open_run", return_value="run-XYZ"),
+        patch("sdlc_core.setup_run.seed_model_assignments"),
         patch("sdlc_core.setup_run._resolve_sha", return_value="abc123"),
         patch("sdlc_core.setup_run._validate_model_connectivity"),
     ):
@@ -447,9 +449,59 @@ def test_main_approach_int_resolves(
     with (
         patch("sdlc_core.setup_run.setup_db", return_value=fake_db),
         patch("sdlc_core.setup_run.open_run", return_value="run-001"),
+        patch("sdlc_core.setup_run.seed_model_assignments"),
         patch("sdlc_core.setup_run._resolve_sha", return_value="sha"),
         patch("sdlc_core.setup_run._validate_model_connectivity"),
     ):
         from sdlc_core.setup_run import main
 
         main()
+
+
+def test_main_idempotent_reuses_existing_run(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    run_cfg = tmp_path / "run_config.toml"
+    run_cfg.write_text(
+        '[run]\nproject = "projx"\napproach = "A1"\n'
+        '[phases]\n'
+        'phase2 = "localmodel"\n'
+        'phase3 = "localmodel"\n'
+        'phase4 = "localmodel"\n'
+        'phase5 = "localmodel"\n'
+        'phase6 = "localmodel"\n'
+        'phase7 = "localmodel"\n'
+        'phase8 = "localmodel"\n',
+        encoding="utf-8",
+    )
+    models = tmp_path / "models.toml"
+    models.write_text(
+        '[models.localmodel]\nprovider = "ollama"\nmodel_id = "llama3"\n',
+        encoding="utf-8",
+    )
+
+    db_path = tmp_path / "logs" / "experiment.db"
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("SDLC_MODELS_TOML", str(models))
+    monkeypatch.setenv("SDLC_DB_PATH", str(db_path))
+
+    with (
+        patch("sdlc_core.setup_run._resolve_sha", return_value="sha"),
+        patch("sdlc_core.setup_run._validate_model_connectivity"),
+    ):
+        from sdlc_core.setup_run import main
+
+        main()
+        main()
+
+    conn = sqlite3.connect(db_path)
+    try:
+        run_count = conn.execute("SELECT COUNT(*) FROM runs").fetchone()[0]
+        assignment_count = conn.execute(
+            "SELECT COUNT(*) FROM model_assignments"
+        ).fetchone()[0]
+    finally:
+        conn.close()
+
+    assert run_count == 1
+    assert assignment_count == 7

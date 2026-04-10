@@ -11,6 +11,7 @@ from sdlc_core.db import (
     accept_artifact,
     close_run,
     close_session,
+    get_model_assignment,
     log_defect,
     log_interaction,
     log_intervention,
@@ -20,6 +21,8 @@ from sdlc_core.db import (
     open_run,
     open_session,
     resolve_defect,
+    seed_model_assignments,
+    set_model_assignment,
     set_phase_status,
     setup_db,
 )
@@ -39,6 +42,7 @@ _EXPECTED_TABLES = {
     "runs",
     "sessions",
     "phase_progress",
+    "model_assignments",
     "artifacts",
     "interactions",
     "interventions",
@@ -194,6 +198,64 @@ def test_set_phase_status_upsert_no_duplicate(db_path: Path, run_id: str) -> Non
     )
     count = q_count(db_path, "phase_progress", "run_id = ?", (run_id,))
     assert count == 1
+
+
+# ---------------------------------------------------------------------------
+# model_assignments
+# ---------------------------------------------------------------------------
+
+
+def test_seed_model_assignments_inserts_phase_rows(db_path: Path, run_id: str) -> None:
+    seed_model_assignments(
+        run_id=run_id,
+        phase_map={2: "llama3-local", 3: "llama3-local"},
+        db_path=db_path,
+    )
+    count = q_count(db_path, "model_assignments", "run_id = ?", (run_id,))
+    assert count == 2
+
+
+def test_seed_model_assignments_does_not_overwrite_by_default(
+    db_path: Path, run_id: str
+) -> None:
+    seed_model_assignments(run_id=run_id, phase_map={2: "a"}, db_path=db_path)
+    seed_model_assignments(run_id=run_id, phase_map={2: "b"}, db_path=db_path)
+
+    row = q_one(
+        db_path,
+        "SELECT model, source FROM model_assignments WHERE run_id = ? AND phase_number = 2",
+        (run_id,),
+    )
+    assert row is not None
+    assert row["model"] == "a"
+    assert row["source"] == "setup"
+
+
+def test_set_model_assignment_upserts_and_marks_reassignment(
+    db_path: Path, run_id: str
+) -> None:
+    seed_model_assignments(run_id=run_id, phase_map={2: "a"}, db_path=db_path)
+    set_model_assignment(run_id=run_id, phase_number=2, model="b", db_path=db_path)
+
+    row = q_one(
+        db_path,
+        "SELECT model, source FROM model_assignments WHERE run_id = ? AND phase_number = 2",
+        (run_id,),
+    )
+    assert row is not None
+    assert row["model"] == "b"
+    assert row["source"] == "reassignment"
+
+
+def test_get_model_assignment_returns_none_when_missing(db_path: Path, run_id: str) -> None:
+    result = get_model_assignment(run_id=run_id, phase_number=2, db_path=db_path)
+    assert result is None
+
+
+def test_get_model_assignment_returns_model_when_present(db_path: Path, run_id: str) -> None:
+    seed_model_assignments(run_id=run_id, phase_map={2: "llama3-local"}, db_path=db_path)
+    result = get_model_assignment(run_id=run_id, phase_number=2, db_path=db_path)
+    assert result == "llama3-local"
 
 
 # ---------------------------------------------------------------------------

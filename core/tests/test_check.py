@@ -17,6 +17,7 @@ from sdlc_core.check import (
     g5_all_sessions_closed,
     g6_unique_artifact_ids_per_run,
     g7_monotonic_pks,
+    g8_single_model_per_run_phase,
     p1_seed_artifacts_registered,
     run_all_checks,
     write_report,
@@ -327,6 +328,65 @@ def test_g7_passes_with_multiple_rows(db_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
+# G8 - single model per run/phase
+# ---------------------------------------------------------------------------
+
+
+def test_g8_passes_when_phase_uses_single_model(db_path: Path) -> None:
+    rid = _open_run(db_path)
+    log_interaction(
+        run_id=rid,
+        sdlc_phase=2,
+        approach=1,
+        agent_role="analyst",
+        model="llama3",
+        prompt="p",
+        response="r",
+        iteration=1,
+        outcome=Outcome.ACCEPTED,
+        human_modified=False,
+        db_path=db_path,
+    )
+    with _conn(db_path) as conn:
+        result = g8_single_model_per_run_phase(conn)
+    assert result["passed"]
+
+
+def test_g8_fails_when_phase_uses_multiple_models(db_path: Path) -> None:
+    rid = _open_run(db_path)
+    log_interaction(
+        run_id=rid,
+        sdlc_phase=2,
+        approach=1,
+        agent_role="analyst",
+        model="llama3",
+        prompt="p1",
+        response="r1",
+        iteration=1,
+        outcome=Outcome.ACCEPTED,
+        human_modified=False,
+        db_path=db_path,
+    )
+    log_interaction(
+        run_id=rid,
+        sdlc_phase=2,
+        approach=1,
+        agent_role="analyst",
+        model="mistral",
+        prompt="p2",
+        response="r2",
+        iteration=2,
+        outcome=Outcome.ACCEPTED,
+        human_modified=False,
+        db_path=db_path,
+    )
+    with _conn(db_path) as conn:
+        result = g8_single_model_per_run_phase(conn)
+    assert not result["passed"]
+    assert "multiple models" in result["detail"]
+
+
+# ---------------------------------------------------------------------------
 # P2-P5 phase exit criteria (artifact presence)
 # ---------------------------------------------------------------------------
 
@@ -344,6 +404,29 @@ def test_phase_check_skipped_when_not_completed(
     entry = next(r for r in results if r["id"] == check_id)
     assert entry["passed"]
     assert "skipped" in entry["detail"]
+
+
+@pytest.mark.parametrize("phase,artifact_type,check_id", [
+    (2, "Requirements Document", "P2"),
+    (3, "Architecture Document", "P3"),
+    (4, "Design Document", "P4"),
+    (5, "Implementation", "P5"),
+])
+def test_phase_check_fails_when_artifact_exists_but_not_completed(
+    db_path: Path, phase: int, artifact_type: str, check_id: str
+) -> None:
+    rid = _open_run(db_path)
+    accept_artifact(
+        run_id=rid,
+        artifact_id=f"ART-MISS-{phase}",
+        artifact_type=artifact_type,
+        phase=phase,
+        db_path=db_path,
+    )
+    results = run_all_checks(db_path)
+    entry = next(r for r in results if r["id"] == check_id)
+    assert not entry["passed"]
+    assert "phase status is not 'completed'" in entry["detail"]
 
 
 @pytest.mark.parametrize("phase,artifact_type,check_id", [
@@ -400,6 +483,25 @@ def test_p6_p7_skipped_when_not_completed(db_path: Path, phase: int, check_id: s
 
 
 @pytest.mark.parametrize("phase,check_id", [(6, "P6"), (7, "P7")])
+def test_p6_p7_fail_when_validation_exists_but_not_completed(
+    db_path: Path, phase: int, check_id: str
+) -> None:
+    rid = _open_run(db_path)
+    log_validation_result(
+        run_id=rid,
+        sdlc_phase=phase,
+        validation_type=ValidationType.TESTING,
+        result=ValidationResult.ACCEPTED,
+        defects_found=0,
+        db_path=db_path,
+    )
+    results = run_all_checks(db_path)
+    entry = next(r for r in results if r["id"] == check_id)
+    assert not entry["passed"]
+    assert "phase status is not 'completed'" in entry["detail"]
+
+
+@pytest.mark.parametrize("phase,check_id", [(6, "P6"), (7, "P7")])
 def test_p6_p7_fails_when_completed_but_no_validation(
     db_path: Path, phase: int, check_id: str
 ) -> None:
@@ -439,6 +541,21 @@ def test_p8_skipped_when_not_completed(db_path: Path) -> None:
     entry = next(r for r in results if r["id"] == "P8")
     assert entry["passed"]
     assert "skipped" in entry["detail"]
+
+
+def test_p8_fails_when_evidence_exists_but_not_completed(db_path: Path) -> None:
+    rid = _open_run(db_path)
+    accept_artifact(
+        run_id=rid,
+        artifact_id="TRANS-MISS-01",
+        artifact_type="Transition Record",
+        phase=8,
+        db_path=db_path,
+    )
+    results = run_all_checks(db_path)
+    entry = next(r for r in results if r["id"] == "P8")
+    assert not entry["passed"]
+    assert "phase status is not 'completed'" in entry["detail"]
 
 
 def test_p8_fails_when_completed_but_transition_evidence_missing(db_path: Path) -> None:
@@ -483,9 +600,9 @@ def test_p8_passes_with_trans_artifact_and_accepted_acceptance_test(db_path: Pat
 # ---------------------------------------------------------------------------
 
 
-def test_run_all_checks_returns_15_results(db_path: Path) -> None:
+def test_run_all_checks_returns_16_results(db_path: Path) -> None:
     results = run_all_checks(db_path)
-    assert len(results) == 15
+    assert len(results) == 16
 
 
 def test_run_all_checks_all_pass_on_seeded_db(db_path: Path) -> None:
@@ -520,7 +637,7 @@ def test_write_report_creates_json(db_path: Path, tmp_path: Path) -> None:
 
 def test_write_report_json_structure(db_path: Path, tmp_path: Path) -> None:
     import json
-    # Seed a phase-1 artifact so P1 passes and all 15 checks pass.
+    # Seed a phase-1 artifact so P1 passes and all 16 checks pass.
     rid = _open_run(db_path)
     accept_artifact(
         run_id=rid, artifact_id="REQ-01", artifact_type="Requirements Document",
@@ -532,8 +649,8 @@ def test_write_report_json_structure(db_path: Path, tmp_path: Path) -> None:
     data = json.loads(out.read_text())
     assert "summary" in data
     assert "checks" in data
-    assert data["summary"]["total"] == 15
-    assert data["summary"]["passed"] == 15
+    assert data["summary"]["total"] == 16
+    assert data["summary"]["passed"] == 16
     assert data["summary"]["failed"] == 0
 
 

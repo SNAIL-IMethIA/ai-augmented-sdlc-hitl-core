@@ -28,8 +28,14 @@ If setup fails, do not start the run. Fix configuration or connectivity first.
 1. Start with the active phase and planned artifact.
 2. Execute approach commands for that artifact.
 3. Record outcome and human intervention notes as required.
-4. Accept artifacts and commit immediately after acceptance.
-5. Check current run state before moving to the next artifact.
+4. Update phase status transitions as they occur.
+5. Accept artifacts and commit immediately after acceptance.
+6. Check current run state before moving to the next artifact.
+
+```bash
+poetry run sdlc-phase-status --phase <2-8> --status in_progress
+poetry run sdlc-phase-status --phase <2-8> --status completed
+```
 
 ```bash
 poetry run sdlc-status --db logs/experiment.db
@@ -44,6 +50,12 @@ poetry run python -m sdlc_core.check --db logs/experiment.db
 ```
 
 If check fails, resolve issues before proceeding.
+
+When ending a work block/day boundary, pause with session close:
+
+```bash
+poetry run sdlc-pause --close-session
+```
 
 ## Change attribution since last commit
 

@@ -292,6 +292,128 @@ def set_phase_status(
 
 
 # ---------------------------------------------------------------------------
+# model_assignments
+# ---------------------------------------------------------------------------
+
+def seed_model_assignments(
+    *,
+    run_id: str,
+    phase_map: dict[int, str],
+    overwrite: bool = False,
+    db_path: Path | None = None,
+) -> None:
+    """Seed effective model assignments for a run from phase configuration.
+
+    Args:
+        run_id:     Identifier of the parent run.
+        phase_map:  Mapping of phase number (2..8) to model name.
+        overwrite:  When ``True``, overwrite existing assignment rows.
+                    When ``False`` (default), keep existing rows.
+        db_path:    Path to ``experiment.db``. Defaults to
+                    :func:`_default_db_path`.
+
+    """
+    if not phase_map:
+        return
+
+    now = _now()
+    with _connect(db_path) as conn:
+        for phase_number, model in sorted(phase_map.items()):
+            if overwrite:
+                conn.execute(
+                    """
+                    INSERT INTO model_assignments
+                        (run_id, phase_number, model, source, assigned_at)
+                    VALUES (?, ?, ?, 'setup', ?)
+                    ON CONFLICT (run_id, phase_number) DO UPDATE SET
+                        model = excluded.model,
+                        source = excluded.source,
+                        assigned_at = excluded.assigned_at
+                    """,
+                    (run_id, phase_number, model, now),
+                )
+                continue
+
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO model_assignments
+                    (run_id, phase_number, model, source, assigned_at)
+                VALUES (?, ?, ?, 'setup', ?)
+                """,
+                (run_id, phase_number, model, now),
+            )
+
+
+def set_model_assignment(
+    *,
+    run_id: str,
+    phase_number: int,
+    model: str,
+    source: str = "reassignment",
+    db_path: Path | None = None,
+) -> None:
+    """Upsert the effective model assignment for one run phase.
+
+    Args:
+        run_id:       Identifier of the parent run.
+        phase_number: SDLC phase number (2 to 8).
+        model:        Model name to set as effective for this phase.
+        source:       Assignment source label (``setup`` or ``reassignment``).
+        db_path:      Path to ``experiment.db``. Defaults to
+                      :func:`_default_db_path`.
+
+    """
+    if source not in {"setup", "reassignment"}:
+        raise ValueError("source must be 'setup' or 'reassignment'")
+
+    with _connect(db_path) as conn:
+        conn.execute(
+            """
+            INSERT INTO model_assignments
+                (run_id, phase_number, model, source, assigned_at)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT (run_id, phase_number) DO UPDATE SET
+                model = excluded.model,
+                source = excluded.source,
+                assigned_at = excluded.assigned_at
+            """,
+            (run_id, phase_number, model, source, _now()),
+        )
+
+
+def get_model_assignment(
+    *,
+    run_id: str,
+    phase_number: int,
+    db_path: Path | None = None,
+) -> str | None:
+    """Return the effective model assignment for one run phase.
+
+    Args:
+        run_id:       Identifier of the parent run.
+        phase_number: SDLC phase number (2 to 8).
+        db_path:      Path to ``experiment.db``. Defaults to
+                      :func:`_default_db_path`.
+
+    Returns:
+        The configured model name, or ``None`` when no assignment exists.
+
+    """
+    with _connect(db_path) as conn:
+        row = conn.execute(
+            """
+            SELECT model
+            FROM model_assignments
+            WHERE run_id = ? AND phase_number = ?
+            """,
+            (run_id, phase_number),
+        ).fetchone()
+    if row is None:
+        return None
+    return str(row[0])
+
+
+# ---------------------------------------------------------------------------
 # artifacts
 # ---------------------------------------------------------------------------
 

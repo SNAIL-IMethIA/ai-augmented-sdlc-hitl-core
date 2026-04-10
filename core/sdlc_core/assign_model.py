@@ -7,9 +7,9 @@ Usage
     poetry run sdlc-assign-model --run-id <run_id> --phase <2-8> --model <model_name>
 
 The new model must exist in ``models.toml`` and its API key env var (if any)
-must be set.  Both the original and new assignment are preserved in the DB
-``interactions`` metadata. This command writes a note to ``violations`` with
-category ``other`` so the change is fully traceable.
+must be set. The effective per-phase mapping is persisted in
+``model_assignments`` and a note is written to ``violations`` with category
+``other`` so the change is fully traceable.
 
 Switching a model mid-run does not restart the run. It simply records what
 was actually used from that point forward.
@@ -89,20 +89,43 @@ def main() -> None:
     models_data = _load_models_toml()
     _validate_model(args.model, models_data)
 
-    # Record the reassignment as a violation row (type "other") for full traceability
-    # The original model is visible in earlier interactions rows
+    # Persist the effective mapping and record a reassignment note for traceability.
     from datetime import UTC, datetime
     now = datetime.now(UTC).isoformat()
-    detail = (
-        f"Model reassignment: phase {args.phase} now uses {args.model!r}. "
-        f"Reassigned at {now}."
-    )
 
     with _connect() as conn:
         # Verify the run ID exists
         row = conn.execute("SELECT id FROM runs WHERE id = ?", (args.run_id,)).fetchone()
         if row is None:
             _die(f"Run ID {args.run_id!r} not found in experiment.db.")
+
+        prev = conn.execute(
+            """
+            SELECT model
+            FROM model_assignments
+            WHERE run_id = ? AND phase_number = ?
+            """,
+            (args.run_id, args.phase),
+        ).fetchone()
+        previous_model = str(prev[0]) if prev is not None else "(unassigned)"
+
+        conn.execute(
+            """
+            INSERT INTO model_assignments
+                (run_id, phase_number, model, source, assigned_at)
+            VALUES (?, ?, ?, 'reassignment', ?)
+            ON CONFLICT (run_id, phase_number) DO UPDATE SET
+                model = excluded.model,
+                source = excluded.source,
+                assigned_at = excluded.assigned_at
+            """,
+            (args.run_id, args.phase, args.model, now),
+        )
+
+        detail = (
+            f"Model reassignment: phase {args.phase} changed from {previous_model!r} "
+            f"to {args.model!r}. Reassigned at {now}."
+        )
 
         conn.execute(
             """

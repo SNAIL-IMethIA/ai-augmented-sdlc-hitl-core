@@ -560,7 +560,15 @@ blocks are not required. Use pause/resume to keep a clean audit trail.
 
 ```bash
 poetry run sdlc-pause
+poetry run sdlc-pause --close-session
 poetry run sdlc-resume
+```
+
+## Recording phase progress
+
+```bash
+poetry run sdlc-phase-status --phase 2 --status in_progress
+poetry run sdlc-phase-status --phase 2 --status completed
 ```
 
 ---
@@ -618,6 +626,7 @@ in `artifacts/phase<N>/`.  All interactions are logged to `logs/experiment.db`.
 |---|---|
 | `poetry run sdlc-setup` | Validate model config/connectivity, then open the run |
 | `poetry run sdlc-assign-model` | Reassign a model for a phase mid-run |
+| `poetry run sdlc-phase-status` | Record phase status transitions (`in_progress`/`completed`) |
 
 ## Setup gate (must pass before the experiment starts)
 
@@ -708,13 +717,15 @@ def _operator_checklist() -> str:
 
 1. Execute planned phase/artifact command.
 2. Record outcomes and interventions.
-3. Accept artifacts only when criteria are met.
-4. Commit after accepted artifacts.
+3. Update phase progress when state changes:
+    - `poetry run sdlc-phase-status --phase <2-8> --status in_progress|completed`
+4. Accept artifacts only when criteria are met.
+5. Commit after accepted artifacts.
 
 ## 3. End of work block
 
 1. Pause cleanly:
-    - `poetry run sdlc-pause`
+    - `poetry run sdlc-pause --close-session`
 2. Run integrity check if a phase boundary was reached:
    - `poetry run python -m sdlc_core.check --db logs/experiment.db`
 3. Commit and push.
@@ -792,12 +803,15 @@ def _collect_issues(phase: int | None) -> list[str]:
         issues.append("logs/experiment.db not found. Run poetry run sdlc-setup.")
         return issues
 
+    latest_run_id: str | None = None
     try:
         conn = sqlite3.connect(db_path)
         try:
             row = conn.execute("SELECT id FROM runs ORDER BY started_at DESC LIMIT 1").fetchone()
             if row is None:
                 issues.append("No run found in logs/experiment.db. Run poetry run sdlc-setup.")
+            else:
+                latest_run_id = str(row[0])
         finally:
             conn.close()
     except sqlite3.OperationalError:
@@ -807,6 +821,37 @@ def _collect_issues(phase: int | None) -> list[str]:
 
     if phase is not None and phase not in range(2, 9):
         issues.append(f"Invalid phase {phase}; expected one of 2..8.")
+        return issues
+
+    if latest_run_id is not None:
+        conn = sqlite3.connect(db_path)
+        try:
+            for p in check_phases:
+                row = conn.execute(
+                    \"\"\"
+                    SELECT model
+                    FROM model_assignments
+                    WHERE run_id = ? AND phase_number = ?
+                    \"\"\",
+                    (latest_run_id, p),
+                ).fetchone()
+                if row is None:
+                    continue
+
+                model_name = str(row[0]).strip()
+                key = f"phase{p}"
+                phases_section[key] = model_name
+                if model_name not in models_section:
+                    issues.append(
+                        f"Model '{model_name}' (effective assignment for {key}) "
+                        "not found in models.toml."
+                    )
+                    continue
+                selected_models.add(model_name)
+        finally:
+            conn.close()
+
+    if issues:
         return issues
 
     if selected_models:
@@ -925,6 +970,9 @@ import sqlite3
 import tomllib
 from pathlib import Path
 
+from sdlc_core.db import get_model_assignment, set_phase_status
+from sdlc_core.enums import PhaseStatus
+from sdlc_core.prompt_validator import validate_prompt
 from sdlc_core.providers import LoggedProvider
 from sdlc_core.providers.registry import get_provider
 from sdlc_core.session import Session
@@ -946,7 +994,11 @@ def _resolve_run_id(db_path: Path, explicit: str | None) -> str:
     return str(row[0])
 
 
-def _model_for_phase(phase: int) -> str:
+def _model_for_phase(db_path: Path, run_id: str, phase: int) -> str:
+    assigned = get_model_assignment(run_id=run_id, phase_number=phase, db_path=db_path)
+    if assigned:
+        return assigned
+
     data = tomllib.loads(Path("run_config.toml").read_text(encoding="utf-8"))
     model = str(data.get("phases", {}).get(f"phase{phase}", "")).strip()
     if not model:
@@ -976,10 +1028,24 @@ def main() -> None:
 
     db_path = Path("logs") / "experiment.db"
     run_id = _resolve_run_id(db_path, args.run_id)
-    model_name = args.model or _model_for_phase(args.phase)
+    model_name = args.model or _model_for_phase(db_path, run_id, args.phase)
     prompt = _load_prompt(args.phase, args.prompt_file)
 
+    set_phase_status(
+        run_id=run_id,
+        phase_number=args.phase,
+        status=PhaseStatus.IN_PROGRESS,
+        db_path=db_path,
+    )
+
     session = Session(run_id=run_id, approach=1, active_phase=args.phase, db_path=db_path)
+    validate_prompt(
+        prompt,
+        session=session,
+        artifact_id=args.artifact_id,
+        db_path=db_path,
+        strict=True,
+    )
     provider = LoggedProvider(get_provider(model_name), session=session)
     provider.complete(prompt, agent_role=args.agent_role, artifact_id=args.artifact_id)
 
@@ -998,9 +1064,11 @@ import json
 import sqlite3
 import tomllib
 from pathlib import Path
+from typing import Any
 
-from sdlc_core.db import log_pipeline_event
-from sdlc_core.enums import PipelineEventType
+from sdlc_core.db import get_model_assignment, log_pipeline_event, set_phase_status
+from sdlc_core.enums import PhaseStatus, PipelineEventType
+from sdlc_core.prompt_validator import validate_prompt
 from sdlc_core.providers import LoggedProvider
 from sdlc_core.providers.registry import get_provider
 from sdlc_core.session import Session
@@ -1022,7 +1090,11 @@ def _resolve_run_id(db_path: Path, explicit: str | None) -> str:
     return str(row[0])
 
 
-def _model_for_phase(phase: int) -> str:
+def _model_for_phase(db_path: Path, run_id: str, phase: int) -> str:
+    assigned = get_model_assignment(run_id=run_id, phase_number=phase, db_path=db_path)
+    if assigned:
+        return assigned
+
     data = tomllib.loads(Path("run_config.toml").read_text(encoding="utf-8"))
     model = str(data.get("phases", {}).get(f"phase{phase}", "")).strip()
     if not model:
@@ -1030,18 +1102,83 @@ def _model_for_phase(phase: int) -> str:
     return model
 
 
-def _load_phase_prompt(phase: int) -> str:
+def _as_bool(value: Any, default: bool) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"1", "true", "yes", "on"}:
+            return True
+        if normalized in {"0", "false", "no", "off"}:
+            return False
+    return default
+
+
+def _load_contract_phase(phase: int) -> dict[str, Any]:
     contract_path = Path("pipeline_contract.json")
-    if contract_path.exists():
-        contract = json.loads(contract_path.read_text(encoding="utf-8"))
-        phase_cfg = contract.get("phases", {}).get(str(phase), {})
-        prompt = str(phase_cfg.get("prompt", "")).strip()
-        if prompt:
-            return prompt
+    if not contract_path.exists():
+        raise ValueError("pipeline_contract.json not found.")
+
+    contract = json.loads(contract_path.read_text(encoding="utf-8"))
+    runtime_policy = contract.get("runtime_policy", {})
+    phase_cfg = contract.get("phases", {}).get(str(phase), {})
+    if not isinstance(runtime_policy, dict) or not isinstance(phase_cfg, dict):
+        raise ValueError(f"Invalid contract structure for phase {phase}")
+
+    default_retries = int(runtime_policy.get("max_retries", 1))
+    max_retries = int(phase_cfg.get("max_retries", default_retries))
+    if max_retries < 0:
+        raise ValueError("max_retries must be >= 0")
+
+    requires_reentry = _as_bool(
+        phase_cfg.get(
+            "requires_reentry_approval",
+            runtime_policy.get("requires_reentry_approval", True),
+        ),
+        True,
+    )
+
+    return {
+        "prompt": str(phase_cfg.get("prompt", "")).strip(),
+        "max_retries": max_retries,
+        "requires_reentry_approval": requires_reentry,
+    }
+
+
+def _load_phase_prompt(phase: int, contract_prompt: str) -> str:
+    if contract_prompt:
+        return contract_prompt
+
     prompt_path = Path("prompts") / f"phase{phase}.md"
     if prompt_path.exists():
         return prompt_path.read_text(encoding="utf-8")
     raise ValueError(f"No prompt available for phase {phase}")
+
+
+def _next_pipeline_id(db_path: Path, run_id: str) -> str:
+    conn = sqlite3.connect(db_path)
+    try:
+        rows = conn.execute(
+                        \"\"\"
+            SELECT pipeline_id
+            FROM pipeline_events
+            WHERE run_id = ?
+              AND pipeline_id LIKE ?
+            ORDER BY id ASC
+                        \"\"\",
+            (run_id, f"PIPE-{run_id}-%"),
+        ).fetchall()
+    finally:
+        conn.close()
+
+    max_index = 0
+    for row in rows:
+        pipeline_id = str(row[0])
+        suffix = pipeline_id.rsplit("-", 1)[-1]
+        if suffix.isdigit():
+            max_index = max(max_index, int(suffix))
+
+    return f"PIPE-{run_id}-{max_index + 1:02d}"
 
 
 def main() -> None:
@@ -1050,6 +1187,11 @@ def main() -> None:
     parser.add_argument("--run-id", default=None)
     parser.add_argument("--artifact-id", default=None)
     parser.add_argument("--agent-role", default="pipeline_orchestrator")
+    parser.add_argument(
+        "--approve-reentry-by",
+        default=None,
+        help="Required approver identity when contract requires re-entry approval.",
+    )
     args = parser.parse_args()
 
     if run_preflight(phase=args.phase, strict=True, quiet=False) != 0:
@@ -1057,9 +1199,35 @@ def main() -> None:
 
     db_path = Path("logs") / "experiment.db"
     run_id = _resolve_run_id(db_path, args.run_id)
-    model_name = _model_for_phase(args.phase)
-    prompt = _load_phase_prompt(args.phase)
-    pipeline_id = f"PIPE-{run_id}"
+    contract_phase = _load_contract_phase(args.phase)
+    model_name = _model_for_phase(db_path, run_id, args.phase)
+    prompt = _load_phase_prompt(args.phase, str(contract_phase["prompt"]))
+    pipeline_id = _next_pipeline_id(db_path, run_id)
+
+    if bool(contract_phase["requires_reentry_approval"]):
+        if not args.approve_reentry_by:
+            log_pipeline_event(
+                run_id=run_id,
+                pipeline_id=pipeline_id,
+                step=f"phase{args.phase}",
+                agent_role=args.agent_role,
+                event_type=PipelineEventType.HALT,
+                detail="Missing required --approve-reentry-by for this phase.",
+                artifact_id=args.artifact_id,
+                db_path=db_path,
+            )
+            raise SystemExit("This phase requires --approve-reentry-by.")
+
+        log_pipeline_event(
+            run_id=run_id,
+            pipeline_id=pipeline_id,
+            step=f"phase{args.phase}",
+            agent_role=args.agent_role,
+            event_type=PipelineEventType.REENTRY_APPROVAL,
+            detail=f"Re-entry approved by {args.approve_reentry_by}.",
+            artifact_id=args.artifact_id,
+            db_path=db_path,
+        )
 
     log_pipeline_event(
         run_id=run_id,
@@ -1072,9 +1240,73 @@ def main() -> None:
         db_path=db_path,
     )
 
-    session = Session(run_id=run_id, approach=2, active_phase=args.phase, db_path=db_path)
-    provider = LoggedProvider(get_provider(model_name), session=session)
-    provider.complete(prompt, agent_role=args.agent_role, artifact_id=args.artifact_id)
+    set_phase_status(
+        run_id=run_id,
+        phase_number=args.phase,
+        status=PhaseStatus.IN_PROGRESS,
+        db_path=db_path,
+    )
+
+    retry_budget = int(contract_phase["max_retries"])
+    max_attempts = retry_budget + 1
+    for attempt in range(1, max_attempts + 1):
+        try:
+            session = Session(run_id=run_id, approach=2, active_phase=args.phase, db_path=db_path)
+            validate_prompt(
+                prompt,
+                session=session,
+                artifact_id=args.artifact_id,
+                db_path=db_path,
+                strict=True,
+            )
+            provider = LoggedProvider(get_provider(model_name), session=session)
+            provider.complete(prompt, agent_role=args.agent_role, artifact_id=args.artifact_id)
+            break
+        except Exception as exc:  # pragma: no cover - exercised in generated repos
+            if attempt < max_attempts:
+                log_pipeline_event(
+                    run_id=run_id,
+                    pipeline_id=pipeline_id,
+                    step=f"phase{args.phase}",
+                    agent_role=args.agent_role,
+                    event_type=PipelineEventType.RETRY,
+                    detail=f"Attempt {attempt}/{max_attempts} failed: {type(exc).__name__}: {exc}",
+                    artifact_id=args.artifact_id,
+                    db_path=db_path,
+                )
+                continue
+
+            log_pipeline_event(
+                run_id=run_id,
+                pipeline_id=pipeline_id,
+                step=f"phase{args.phase}",
+                agent_role=args.agent_role,
+                event_type=PipelineEventType.GATE_FAIL,
+                detail=f"Final attempt failed: {type(exc).__name__}: {exc}",
+                artifact_id=args.artifact_id,
+                db_path=db_path,
+            )
+            log_pipeline_event(
+                run_id=run_id,
+                pipeline_id=pipeline_id,
+                step=f"phase{args.phase}",
+                agent_role=args.agent_role,
+                event_type=PipelineEventType.CIRCUIT_BREAK,
+                detail="Retry budget exhausted; circuit breaker triggered.",
+                artifact_id=args.artifact_id,
+                db_path=db_path,
+            )
+            log_pipeline_event(
+                run_id=run_id,
+                pipeline_id=pipeline_id,
+                step=f"phase{args.phase}",
+                agent_role=args.agent_role,
+                event_type=PipelineEventType.HALT,
+                detail="Execution halted pending human intervention.",
+                artifact_id=args.artifact_id,
+                db_path=db_path,
+            )
+            raise SystemExit(1) from exc
 
     log_pipeline_event(
         run_id=run_id,
@@ -1082,7 +1314,7 @@ def main() -> None:
         step=f"phase{args.phase}",
         agent_role=args.agent_role,
         event_type=PipelineEventType.GATE_PASS,
-        detail="Phase execution completed",
+        detail=f"Phase execution completed within {max_attempts} attempt budget.",
         artifact_id=args.artifact_id,
         db_path=db_path,
     )
@@ -1189,6 +1421,15 @@ def _scaffold(
                 "ambiguity_escalation": "enabled",
                 "structured_context_transfer": "required",
                 "hitl_checkpoints": "enabled",
+                  "max_retries": 1,
+                  "requires_reentry_approval": True,
+                  "circuit_breaker_conditions": [
+                      "retry_budget_exhausted",
+                      "three_consecutive_gate_failures",
+                      "explicit_uncertainty_or_refusal",
+                      "missing_required_upstream_reference",
+                      "pipeline_timeout_exceeded",
+                  ],
             },
             "phases": {
                 str(phase): {
@@ -1196,6 +1437,9 @@ def _scaffold(
                     "inputs": [],
                     "outputs": [],
                     "acceptance_criteria": [],
+                      "prompt": "",
+                      "max_retries": 1,
+                      "requires_reentry_approval": True,
                 }
                 for phase in range(2, 9)
             },

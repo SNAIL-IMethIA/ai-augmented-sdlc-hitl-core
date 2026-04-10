@@ -205,9 +205,20 @@ def test_main_success_writes_violation(
         "SELECT * FROM violations WHERE run_id = ? AND violation_type = 'other'",
         (run_id,),
     ).fetchall()
+    assignment = conn.execute(
+        """
+        SELECT model, source
+        FROM model_assignments
+        WHERE run_id = ? AND phase_number = 4
+        """,
+        (run_id,),
+    ).fetchone()
     conn.close()
     assert len(rows) == 1
     assert "localmodel" in rows[0][4]  # detail column (index 4) contains model name
+    assert assignment is not None
+    assert assignment[0] == "localmodel"
+    assert assignment[1] == "reassignment"
 
 
 def test_main_invalid_phase_rejected(
