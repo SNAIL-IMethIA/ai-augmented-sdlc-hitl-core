@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from sdlc_core.db import (
     accept_artifact,
     log_interaction,
@@ -54,7 +56,7 @@ def test_artifact_ids_from_paths_extracts_expected_values() -> None:
 
 def test_diff_summary_classifies_human_modified_artifact(
     tmp_path: Path,
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     db_path = tmp_path / "experiment.db"
     setup_db(db_path)
